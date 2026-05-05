@@ -12,20 +12,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  access: 'private' as const,
  });
  
- if (!blobResult) {
+ if (!blobResult || blobResult.statusCode === 304) {
  return res.status(404).json({ status: 'error', message: '文件不存在' });
  }
  
- if (blobResult.statusCode === 304) {
- return res.status(304).end();
- }
+ const { stream, blob } = blobResult;
  
- const downloadUrl = blobResult.blob.downloadUrl || blobResult.blob.url;
- if (!downloadUrl) {
- return res.status(404).json({ status: 'error', message: '无法获取下载链接' });
- }
+ res.setHeader('Content-Type', blob.contentType || 'application/octet-stream');
+ res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(blob.pathname)}"`);
+ res.setHeader('Content-Length', blob.size.toString());
+ res.setHeader('Cache-Control', blob.cacheControl);
+ res.setHeader('ETag', blob.etag);
  
- res.redirect(downloadUrl);
+ const reader = stream.getReader();
+ const pump = async () => {
+ const { done, value } = await reader.read();
+ if (done) {
+ res.end();
+ return;
+ }
+ res.write(value);
+ await pump();
+ };
+ 
+ await pump();
+ 
  } catch (error: any) {
  console.error('Download error:', error);
  return res.status(500).json({ status: 'error', message: '下载失败: ' + (error.message || '未知错误') });
