@@ -1,4 +1,4 @@
-import { list, put } from '@vercel/blob';
+import { get } from '@vercel/blob';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -8,17 +8,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  }
 
  try {
- const { blobs } = await list();
- const blob = blobs.find(b => b.pathname === filename);
- if (!blob) {
+ const blobResult = await get(filename, {
+ access: 'private' as const,
+ });
+ 
+ if (!blobResult) {
  return res.status(404).json({ status: 'error', message: '文件不存在' });
  }
  
- if (blob.url) {
- res.redirect(blob.url);
- } else {
- return res.status(403).json({ status: 'error', message: '无法直接下载私有文件，请联系管理员' });
+ if (blobResult.statusCode === 304) {
+ return res.status(304).end();
  }
+ 
+ const downloadUrl = blobResult.blob.downloadUrl || blobResult.blob.url;
+ if (!downloadUrl) {
+ return res.status(404).json({ status: 'error', message: '无法获取下载链接' });
+ }
+ 
+ res.redirect(downloadUrl);
  } catch (error: any) {
  console.error('Download error:', error);
  return res.status(500).json({ status: 'error', message: '下载失败: ' + (error.message || '未知错误') });
