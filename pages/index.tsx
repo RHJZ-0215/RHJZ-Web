@@ -118,7 +118,7 @@ export default function Home() {
       try {
         result = await response.json()
       } catch {
-        showMessage(`上传失败，服务器返回无效响应`, 'error')
+        showMessage('上传失败，服务器返回无效响应', 'error')
         return
       }
       
