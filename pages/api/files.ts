@@ -15,6 +15,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const files = fs.readdirSync(uploadDir).filter(file => {
+      if (file === '.gitkeep') return false
       const filePath = path.join(uploadDir, file)
       return fs.statSync(filePath).isFile()
     }).map(file => {

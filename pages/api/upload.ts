@@ -26,6 +26,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     maxFileSize: 50 * 1024 * 1024,
   })
 
+  form.on('fileBegin', (_name, file) => {
+    const filename = file.originalFilename || file.newFilename
+    file.filepath = path.join(uploadDir, filename)
+  })
+
   form.parse(req, (err, _fields, files) => {
     if (err) {
       console.error('Upload error:', err)
