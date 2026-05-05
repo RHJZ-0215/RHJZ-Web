@@ -2,6 +2,7 @@ import { put } from '@vercel/blob';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm } from 'formidable';
 import fs from 'fs/promises';
+import path from 'path';
 
 export const config = {
  api: {
@@ -19,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  form.parse(req, async (err, _fields, files) => {
  if (err) {
  console.error('Parse error:', err);
- return res.status(500).json({ status: 'error', message: '解析文件失败' });
+ return res.status(500).json({ status: 'error', message: '解析文件失败: ' + err.message });
  }
 
  const file = files.file;
@@ -30,14 +31,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  const fileObj = Array.isArray(file) ? file[0] : file;
 
  try {
- const buffer = await fs.readFile(fileObj.filepath);
- const result = await put(fileObj.originalFilename || fileObj.newFilename, buffer, {
+ const filePath = (fileObj as any).filepath || (fileObj as any).path;
+ if (!filePath) {
+ return res.status(500).json({ status: 'error', message: '无法获取文件路径' });
+ }
+ 
+ const buffer = await fs.readFile(filePath);
+ const filename = (fileObj as any).originalFilename || (fileObj as any).newFilename || 'unknown';
+ 
+ const result = await put(filename, buffer, {
  access: 'public',
  });
+ 
  return res.status(200).json({ status: 'success', message: '上传成功', url: result.url });
- } catch (error) {
+ } catch (error: any) {
  console.error('Upload error:', error);
- return res.status(500).json({ status: 'error', message: '上传失败' });
+ return res.status(500).json({ status: 'error', message: '上传失败: ' + (error.message || '未知错误') });
  }
  });
 }
