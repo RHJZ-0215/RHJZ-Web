@@ -5,6 +5,7 @@ interface FileItem {
   size: number
   size_str: string
   mtime: string
+  url?: string
 }
 
 export default function Home() {
