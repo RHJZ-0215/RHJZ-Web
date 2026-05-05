@@ -114,19 +114,27 @@ export default function Home() {
         body: formData,
       })
       
-      if (!response.ok) {
-        showMessage(`上传失败，状态码: ${response.status}`, 'error')
+      let result
+      try {
+        result = await response.json()
+      } catch {
+        showMessage(`上传失败，服务器返回无效响应`, 'error')
         return
       }
       
-      const result = await response.json()
+      if (!response.ok) {
+        const errorMsg = result?.details ? `${result.message}: ${result.details}` : result?.message || `上传失败，状态码: ${response.status}`
+        showMessage(errorMsg, 'error')
+        return
+      }
       
       if (!result || typeof result.status !== 'string' || typeof result.message !== 'string') {
         showMessage('上传失败，响应格式错误', 'error')
         return
       }
       
-      showMessage(result.message, result.status === 'success' ? 'success' : 'error')
+      const successMsg = result.filename ? `${result.message} - ${result.filename}` : result.message
+      showMessage(successMsg, result.status === 'success' ? 'success' : 'error')
       
       if (result.status === 'success') {
         setSelectedFileName('')
