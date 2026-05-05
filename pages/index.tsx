@@ -25,10 +25,20 @@ export default function Home() {
   const fetchFiles = async () => {
     try {
       const response = await fetch('/api/files')
+      if (!response.ok) {
+        console.error('Failed to fetch files:', response.status)
+        setFiles([])
+        return
+      }
       const data = await response.json()
+      if (!data || !Array.isArray(data.files)) {
+        setFiles([])
+        return
+      }
       setFiles(data.files)
     } catch (error) {
       console.error('Failed to fetch files:', error)
+      setFiles([])
     }
   }
 
