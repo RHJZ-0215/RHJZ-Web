@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { del, list } from '@vercel/blob'
+import fs from 'fs'
+import path from 'path'
 
 function isAdmin(req: NextApiRequest): boolean {
   const cookies = req.headers.cookie || ''
@@ -22,6 +24,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      const backupDir = path.join('/tmp', 'uploads')
+      const filePath = path.join(backupDir, filename)
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ status: 'error', message: '文件不存在' })
+      }
+
+      fs.unlinkSync(filePath)
+      return res.status(200).json({ status: 'success', message: `文件 "${filename}" 删除成功` })
+    }
+
     const { blobs } = await list()
     const blob = blobs.find(b => b.pathname === filename)
 
