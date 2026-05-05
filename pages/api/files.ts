@@ -7,7 +7,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ status: 'error', message: 'Method not allowed' })
   }
 
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join('/tmp', 'uploads')
   
   try {
     if (!fs.existsSync(uploadDir)) {

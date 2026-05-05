@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import fs from 'fs'
 import path from 'path'
-import { IncomingForm } from 'formidable'
+import { IncomingForm, Fields, Files } from 'formidable'
+import { promises as fsPromises } from 'fs'
 
 export const config = {
   api: {
@@ -14,10 +15,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ status: 'error', message: 'Method not allowed' })
   }
 
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join('/tmp', 'uploads')
   
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true })
+  try {
+    await fsPromises.mkdir(uploadDir, { recursive: true })
+    console.log('Upload directory created:', uploadDir)
+  } catch (err: any) {
+    console.error('Failed to create upload directory:', err.message)
+    return res.status(500).json({ status: 'error', message: '创建上传目录失败' })
   }
 
   const form = new IncomingForm({
@@ -29,13 +34,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   form.on('fileBegin', (_name, file) => {
     const filename = file.originalFilename || file.newFilename
     file.filepath = path.join(uploadDir, filename)
+    console.log('File will be saved to:', file.filepath)
   })
 
-  form.parse(req, (err, _fields, files) => {
-    if (err) {
-      console.error('Upload error:', err)
-      return res.status(500).json({ status: 'error', message: '文件上传失败' })
-    }
+  try {
+    const [fields, files] = await new Promise<[Fields<string>, Files<string>]>((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve([fields, files])
+        }
+      })
+    })
 
     const file = files.file
     if (!file) {
@@ -45,9 +56,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fileObj = Array.isArray(file) ? file[0] : file
     const filename = fileObj.originalFilename || fileObj.newFilename
 
-    res.status(200).json({
+    console.log('File uploaded:', filename)
+    return res.status(200).json({
       status: 'success',
       message: `文件 "${filename}" 上传成功`
     })
-  })
+  } catch (err: any) {
+    console.error('Upload error:', err.message)
+    return res.status(500).json({ 
+      status: 'error', 
+      message: '文件上传失败',
+      error: err.message || 'Unknown error'
+    })
+  }
 }

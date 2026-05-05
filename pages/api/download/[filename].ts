@@ -10,7 +10,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const { filename } = req.query
   const decodedFilename = decodeURIComponent(filename as string)
   
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join('/tmp', 'uploads')
   const filePath = path.join(uploadDir, decodedFilename)
 
   try {

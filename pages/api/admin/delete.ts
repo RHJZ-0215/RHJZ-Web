@@ -22,7 +22,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ status: 'error', message: '文件名不能为空' })
   }
 
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join('/tmp', 'uploads')
   const filePath = path.join(uploadDir, filename)
 
   try {
