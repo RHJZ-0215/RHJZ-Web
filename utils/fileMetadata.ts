@@ -1,5 +1,4 @@
-import fs from 'fs/promises';
-import path from 'path';
+import { get, put, del } from '@vercel/blob';
 
 export interface FileMetadata {
   filename: string;
@@ -8,24 +7,17 @@ export interface FileMetadata {
   uploadedBy?: string;
 }
 
-const METADATA_FILE = path.join(process.cwd(), 'data', 'fileMetadata.json');
-
-export async function initMetadata() {
-  try {
-    await fs.mkdir(path.dirname(METADATA_FILE), { recursive: true });
-    try {
-      await fs.access(METADATA_FILE);
-    } catch {
-      await fs.writeFile(METADATA_FILE, JSON.stringify({}));
-    }
-  } catch (error) {
-    console.error('Failed to initialize file metadata:', error);
-  }
-}
+const METADATA_KEY = 'fileMetadata.json';
 
 export async function getMetadata(filename: string): Promise<FileMetadata | null> {
   try {
-    const data = await fs.readFile(METADATA_FILE, 'utf-8');
+    const result = await get(METADATA_KEY, { access: 'private' as const });
+    if (!result) return null;
+    
+    const content = await result.stream?.getReader().read();
+    if (!content || content.done) return null;
+    
+    const data = new TextDecoder().decode(content.value);
     const metadata = JSON.parse(data);
     return metadata[filename] || null;
   } catch {
@@ -35,13 +27,17 @@ export async function getMetadata(filename: string): Promise<FileMetadata | null
 
 export async function setMetadata(filename: string, metadata: Partial<FileMetadata>): Promise<void> {
   try {
-    // 确保目录存在
-    await fs.mkdir(path.dirname(METADATA_FILE), { recursive: true });
-    
     let allMetadata: Record<string, FileMetadata> = {};
+    
     try {
-      const data = await fs.readFile(METADATA_FILE, 'utf-8');
-      allMetadata = JSON.parse(data);
+      const result = await get(METADATA_KEY, { access: 'private' as const });
+      if (result && result.stream) {
+        const content = await result.stream.getReader().read();
+        if (content && !content.done) {
+          const data = new TextDecoder().decode(content.value);
+          allMetadata = JSON.parse(data);
+        }
+      }
     } catch {
       // 文件不存在，使用空对象
     }
@@ -53,7 +49,12 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
     };
     
     allMetadata[filename] = { ...existing, ...metadata };
-    await fs.writeFile(METADATA_FILE, JSON.stringify(allMetadata, null, 2));
+    const jsonContent = JSON.stringify(allMetadata, null, 2);
+    
+    await put(METADATA_KEY, jsonContent, { 
+      access: 'private' as const,
+      contentType: 'application/json'
+    });
   } catch (error) {
     console.error('Failed to set file metadata:', error);
     throw error;
@@ -69,9 +70,13 @@ export async function toggleHidden(filename: string): Promise<boolean> {
 
 export async function getAllMetadata(): Promise<Record<string, FileMetadata>> {
   try {
-    // 确保目录存在
-    await fs.mkdir(path.dirname(METADATA_FILE), { recursive: true });
-    const data = await fs.readFile(METADATA_FILE, 'utf-8');
+    const result = await get(METADATA_KEY, { access: 'private' as const });
+    if (!result || !result.stream) return {};
+    
+    const content = await result.stream.getReader().read();
+    if (!content || content.done) return {};
+    
+    const data = new TextDecoder().decode(content.value);
     return JSON.parse(data);
   } catch {
     return {};
