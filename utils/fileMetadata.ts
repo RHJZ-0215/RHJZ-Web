@@ -35,8 +35,16 @@ export async function getMetadata(filename: string): Promise<FileMetadata | null
 
 export async function setMetadata(filename: string, metadata: Partial<FileMetadata>): Promise<void> {
   try {
-    const data = await fs.readFile(METADATA_FILE, 'utf-8');
-    const allMetadata = JSON.parse(data);
+    // 确保目录存在
+    await fs.mkdir(path.dirname(METADATA_FILE), { recursive: true });
+    
+    let allMetadata: Record<string, FileMetadata> = {};
+    try {
+      const data = await fs.readFile(METADATA_FILE, 'utf-8');
+      allMetadata = JSON.parse(data);
+    } catch {
+      // 文件不存在，使用空对象
+    }
     
     const existing = allMetadata[filename] || {
       filename,
@@ -61,6 +69,8 @@ export async function toggleHidden(filename: string): Promise<boolean> {
 
 export async function getAllMetadata(): Promise<Record<string, FileMetadata>> {
   try {
+    // 确保目录存在
+    await fs.mkdir(path.dirname(METADATA_FILE), { recursive: true });
     const data = await fs.readFile(METADATA_FILE, 'utf-8');
     return JSON.parse(data);
   } catch {
