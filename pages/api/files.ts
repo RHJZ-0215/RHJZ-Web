@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  const admin = isAdmin(req);
  
  const files = blobs
- .filter(blob => !blob.pathname.endsWith('.gitkeep'))
+ .filter(blob => !blob.pathname.endsWith('.gitkeep') && blob.pathname !== 'fileMetadata.json')
  .map(blob => {
  const fileMetadata = metadata[blob.pathname];
  const hidden = fileMetadata?.hidden || false;

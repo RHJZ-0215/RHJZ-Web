@@ -184,6 +184,9 @@ export default function Home() {
         setShowLoginModal(false)
         setUsername('')
         setPassword('')
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       }
     } catch (error) {
       showMessage('登录失败', 'error')
@@ -199,6 +202,9 @@ export default function Home() {
       showMessage(result.message, result.status === 'success' ? 'success' : 'error')
       if (result.status === 'success') {
         setIsAdmin(false)
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       }
     } catch (error) {
       showMessage('退出失败', 'error')
