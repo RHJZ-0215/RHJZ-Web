@@ -234,6 +234,11 @@ export default function Home() {
   const handleToggleHidden = async (filename: string, currentHidden: boolean) => {
     try {
       const targetHidden = !currentHidden
+      
+      setFiles(prevFiles => prevFiles.map(file => 
+        file.name === filename ? { ...file, hidden: targetHidden } : file
+      ))
+      
       const response = await fetch('/api/admin/toggleHidden', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,9 +248,16 @@ export default function Home() {
       showMessage(result.message, result.status === 'success' ? 'success' : 'error')
       if (result.status === 'success') {
         fetchFiles()
+      } else {
+        setFiles(prevFiles => prevFiles.map(file => 
+          file.name === filename ? { ...file, hidden: currentHidden } : file
+        ))
       }
     } catch (error) {
       showMessage('操作失败', 'error')
+      setFiles(prevFiles => prevFiles.map(file => 
+        file.name === filename ? { ...file, hidden: currentHidden } : file
+      ))
     }
   }
 
