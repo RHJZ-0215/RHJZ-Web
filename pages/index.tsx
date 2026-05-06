@@ -246,9 +246,7 @@ export default function Home() {
       })
       const result = await response.json()
       showMessage(result.message, result.status === 'success' ? 'success' : 'error')
-      if (result.status === 'success') {
-        fetchFiles()
-      } else {
+      if (result.status !== 'success') {
         setFiles(prevFiles => prevFiles.map(file => 
           file.name === filename ? { ...file, hidden: currentHidden } : file
         ))
