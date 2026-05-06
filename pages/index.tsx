@@ -343,13 +343,28 @@ export default function Home() {
           <div className="file-list">
             {files.length > 0 ? (
               files.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="file-item">
+                <div 
+                  key={`${file.name}-${index}`} 
+                  className="file-item"
+                  style={{ opacity: file.hidden && isAdmin ? 0.5 : 1 }}
+                >
                   <div className="file-info">
                     <div className="file-icon">
-                      <i className="fas fa-file-alt"></i>
+                      {file.hidden && isAdmin ? (
+                        <i className="fas fa-eye-slash" style={{ color: '#95a5a6' }}></i>
+                      ) : (
+                        <i className="fas fa-file-alt"></i>
+                      )}
                     </div>
                     <div className="file-details">
-                      <h4>{file.name}</h4>
+                      <h4>
+                        {file.name}
+                        {file.hidden && isAdmin && (
+                          <span style={{ color: '#95a5a6', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                            (隐藏)
+                          </span>
+                        )}
+                      </h4>
                       <div className="file-meta">
                         <span>
                           <i className="fas fa-clock"></i> {file.mtime}
@@ -365,13 +380,22 @@ export default function Home() {
                       <i className="fas fa-download"></i> 下载
                     </a>
                     {isAdmin && (
-                      <button 
-                        className="btn" 
-                        onClick={() => handleDeleteFile(file.name)}
-                        style={{ background: '#e74c3c' }}
-                      >
-                        <i className="fas fa-trash"></i> 删除
-                      </button>
+                      <>
+                        <button 
+                          className="btn" 
+                          onClick={() => handleToggleHidden(file.name, file.hidden)}
+                          style={{ background: file.hidden ? '#3498db' : '#f39c12' }}
+                        >
+                          <i className={`fas ${file.hidden ? 'fa-eye' : 'fa-eye-slash'}`}></i> {file.hidden ? '显示' : '隐藏'}
+                        </button>
+                        <button 
+                          className="btn" 
+                          onClick={() => handleDeleteFile(file.name)}
+                          style={{ background: '#e74c3c' }}
+                        >
+                          <i className="fas fa-trash"></i> 删除
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
