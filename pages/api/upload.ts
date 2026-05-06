@@ -2,6 +2,15 @@ import { put } from '@vercel/blob';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm } from 'formidable';
 import fs from 'fs/promises';
+import { addLog } from '../../utils/logger';
+
+function getClientIp(req: NextApiRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
 
 export const config = {
  api: {
@@ -68,6 +77,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  });
  
  console.log('Upload successful:', result.url);
+ await addLog({
+ ip: getClientIp(req),
+ type: 'upload',
+ action: '文件上传',
+ details: `文件: ${filename}, 大小: ${buffer.length} bytes`
+ });
  return res.status(200).json({ 
  status: 'success', 
  message: '上传成功',

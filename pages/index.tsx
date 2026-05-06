@@ -5,6 +5,7 @@ interface FileItem {
   size: number
   size_str: string
   mtime: string
+  hidden: boolean
 }
 
 export default function Home() {
@@ -19,6 +20,10 @@ export default function Home() {
   const [password, setPassword] = useState('')
   const [command, setCommand] = useState('')
   const [cmdResult, setCmdResult] = useState('')
+  const [currentDir, setCurrentDir] = useState('')
+  const [logs, setLogs] = useState<any[]>([])
+  const [logTypeFilter, setLogTypeFilter] = useState('all')
+  const [showLogs, setShowLogs] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAreaRef = useRef<HTMLDivElement>(null)
 
@@ -49,6 +54,23 @@ export default function Home() {
       setIsAdmin(data.isAdmin)
     } catch (error) {
       console.error('Failed to check admin status:', error)
+    }
+  }
+
+  const fetchLogs = async () => {
+    try {
+      const url = logTypeFilter === 'all' 
+        ? '/api/admin/logs' 
+        : `/api/admin/logs?type=${logTypeFilter}`
+      const response = await fetch(url)
+      if (!response.ok) {
+        console.error('Failed to fetch logs:', response.status)
+        return
+      }
+      const data = await response.json()
+      setLogs(data.data || [])
+    } catch (error) {
+      console.error('Failed to fetch logs:', error)
     }
   }
 
@@ -203,6 +225,23 @@ export default function Home() {
     }
   }
 
+  const handleToggleHidden = async (filename: string, currentHidden: boolean) => {
+    try {
+      const response = await fetch('/api/admin/toggleHidden', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      })
+      const result = await response.json()
+      showMessage(result.message, result.status === 'success' ? 'success' : 'error')
+      if (result.status === 'success') {
+        fetchFiles()
+      }
+    } catch (error) {
+      showMessage('操作失败', 'error')
+    }
+  }
+
   const handleExecuteCommand = async () => {
     if (!command.trim()) {
       showMessage('请输入命令', 'error')
@@ -215,6 +254,12 @@ export default function Home() {
         body: JSON.stringify({ command }),
       })
       const result = await response.json()
+      
+      // 更新当前目录
+      if (result.cwd) {
+        setCurrentDir(result.cwd)
+      }
+      
       let output = ''
       if (result.stdout) output += `标准输出:\n${result.stdout}\n\n`
       if (result.stderr) output += `错误输出:\n${result.stderr}`
@@ -342,10 +387,23 @@ export default function Home() {
       </div>
 
       {isAdmin && (
-        <div className="card" style={{ marginTop: '2rem' }}>
-          <h2>
-            <i className="fas fa-terminal"></i> 命令执行（管理员）
-          </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div className="card">
+            <h2>
+              <i className="fas fa-terminal"></i> 命令执行（管理员）
+            </h2>
+          {currentDir && (
+            <div style={{ 
+              background: '#f8f9fa', 
+              padding: '0.5rem 1rem', 
+              borderRadius: '6px', 
+              marginBottom: '1rem',
+              fontFamily: 'monospace',
+              color: '#333'
+            }}>
+              <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
             <input
               type="text"
@@ -371,6 +429,105 @@ export default function Home() {
               <pre>{cmdResult}</pre>
             </div>
           )}
+        </div>
+
+        <div className="card" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>
+              <i className="fas fa-file-alt"></i> 系统日志
+            </h2>
+            <button 
+              className="btn" 
+              onClick={() => { 
+                setShowLogs(!showLogs); 
+                if (!showLogs) fetchLogs(); 
+              }}
+              style={{ background: showLogs ? '#666' : '#3498db' }}
+            >
+              <i className="fas fa-eye"></i> {showLogs ? '隐藏日志' : '查看日志'}
+            </button>
+          </div>
+          
+          {showLogs && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                {['all', 'access', 'upload', 'download', 'login', 'logout', 'command', 'error', 'system'].map((type) => (
+                  <button
+                    key={type}
+                    className="btn"
+                    onClick={() => { setLogTypeFilter(type); fetchLogs(); }}
+                    style={{ 
+                      background: logTypeFilter === type ? '#3498db' : '#95a5a6',
+                      padding: '0.3rem 0.8rem',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {type === 'all' ? '全部' : 
+                     type === 'access' ? '访问' :
+                     type === 'upload' ? '上传' :
+                     type === 'download' ? '下载' :
+                     type === 'login' ? '登录' :
+                     type === 'logout' ? '退出' :
+                     type === 'command' ? '命令' :
+                     type === 'error' ? '错误' : '系统'}
+                  </button>
+                ))}
+              </div>
+              
+              <div style={{ 
+                background: '#f8f9fa', 
+                padding: '1rem', 
+                borderRadius: '6px', 
+                maxHeight: '400px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem'
+              }}>
+                {logs.length > 0 ? (
+                  <div>
+                    {logs.map((log) => {
+                      const date = new Date(log.timestamp)
+                      const formattedDate = date.toLocaleString('zh-CN')
+                      const typeColors: Record<string, string> = {
+                        access: '#3498db',
+                        upload: '#2ecc71',
+                        download: '#3498db',
+                        login: '#f39c12',
+                        logout: '#9b59b6',
+                        command: '#1abc9c',
+                        error: '#e74c3c',
+                        system: '#95a5a6'
+                      }
+                      return (
+                        <div key={log.id} style={{ 
+                          padding: '0.5rem', 
+                          borderBottom: '1px solid #e9ecef',
+                          display: 'flex',
+                          gap: '1rem'
+                        }}>
+                          <span style={{ color: '#666', whiteSpace: 'nowrap' }}>[{formattedDate}]</span>
+                          <span style={{ color: typeColors[log.type] || '#333', whiteSpace: 'nowrap' }}>[{log.type === 'access' ? '访问' :
+                             log.type === 'upload' ? '上传' :
+                             log.type === 'download' ? '下载' :
+                             log.type === 'login' ? '登录' :
+                             log.type === 'logout' ? '退出' :
+                             log.type === 'command' ? '命令' :
+                             log.type === 'error' ? '错误' : '系统'}]</span>
+                          <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{log.ip}</span>
+                          <span style={{ fontWeight: '500' }}>{log.action}</span>
+                          <span>{log.details}</span>
+                          {log.username && <span style={{ color: '#9b59b6' }}>(用户: {log.username})</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: '#666' }}>暂无日志记录</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         </div>
       )}
 

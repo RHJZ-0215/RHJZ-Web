@@ -1,5 +1,14 @@
 import { get } from '@vercel/blob';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { addLog } from '../../../utils/logger';
+
+function getClientIp(req: NextApiRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
  const { filename } = req.query;
@@ -36,6 +45,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  };
  
  await pump();
+ 
+ await addLog({
+ ip: getClientIp(req),
+ type: 'download',
+ action: '文件下载',
+ details: `文件: ${filename}, 大小: ${blob.size} bytes`
+ });
  
  } catch (error: any) {
  console.error('Download error:', error);
