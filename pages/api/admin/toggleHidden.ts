@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { toggleHidden, getMetadata } from '../../../utils/fileMetadata';
+import { setMetadata } from '../../../utils/fileMetadata';
 import { addLog } from '../../../utils/logger';
 
 function isAdmin(req: NextApiRequest): boolean {
@@ -24,15 +24,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ status: 'error', message: '未登录或权限不足' });
   }
 
-  const { filename } = req.body;
+  const { filename, hidden } = req.body;
 
   if (!filename) {
     return res.status(400).json({ status: 'error', message: '文件名不能为空' });
   }
 
   try {
-    const newHidden = await toggleHidden(filename);
-    const action = newHidden ? '隐藏' : '显示';
+    await setMetadata(filename, { hidden: hidden === true });
+    const action = hidden ? '隐藏' : '显示';
     
     await addLog({
       ip: getClientIp(req),
@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ 
       status: 'success', 
       message: `文件已${action}`,
-      hidden: newHidden
+      hidden: hidden === true
     });
   } catch (error: any) {
     console.error('Toggle hidden error:', error);

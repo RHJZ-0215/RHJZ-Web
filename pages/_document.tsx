@@ -6,6 +6,7 @@ class MyDocument extends Document {
       <Html lang="zh-CN">
         <Head>
           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+          <link rel="icon" href="/RHJZ.ico" type="image/x-icon" />
         </Head>
         <body>
           <Main />

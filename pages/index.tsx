@@ -233,10 +233,11 @@ export default function Home() {
 
   const handleToggleHidden = async (filename: string, currentHidden: boolean) => {
     try {
+      const targetHidden = !currentHidden
       const response = await fetch('/api/admin/toggleHidden', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename }),
+        body: JSON.stringify({ filename, hidden: targetHidden }),
       })
       const result = await response.json()
       showMessage(result.message, result.status === 'success' ? 'success' : 'error')
