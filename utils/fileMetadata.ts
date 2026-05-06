@@ -53,7 +53,8 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
     
     await put(METADATA_KEY, jsonContent, { 
       access: 'private' as const,
-      contentType: 'application/json'
+      contentType: 'application/json',
+      allowOverwrite: true
     });
   } catch (error) {
     console.error('Failed to set file metadata:', error);

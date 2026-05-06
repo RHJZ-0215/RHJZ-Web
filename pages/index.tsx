@@ -186,7 +186,7 @@ export default function Home() {
         setPassword('')
         setTimeout(() => {
           window.location.reload()
-        }, 1000)
+        }, 300)
       }
     } catch (error) {
       showMessage('登录失败', 'error')
@@ -204,7 +204,7 @@ export default function Home() {
         setIsAdmin(false)
         setTimeout(() => {
           window.location.reload()
-        }, 1000)
+        }, 300)
       }
     } catch (error) {
       showMessage('退出失败', 'error')
