@@ -12,15 +12,19 @@ const METADATA_KEY = 'fileMetadata.json';
 export async function getMetadata(filename: string): Promise<FileMetadata | null> {
   try {
     const result = await get(METADATA_KEY, { access: 'private' as const });
-    if (!result) return null;
+    if (!result || !result.blob) return null;
     
-    const content = await result.stream?.getReader().read();
+    const stream = result.stream;
+    if (!stream) return null;
+    
+    const content = await stream.getReader().read();
     if (!content || content.done) return null;
     
     const data = new TextDecoder().decode(content.value);
     const metadata = JSON.parse(data);
     return metadata[filename] || null;
-  } catch {
+  } catch (error) {
+    console.error('getMetadata error:', error);
     return null;
   }
 }
@@ -31,15 +35,19 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
     
     try {
       const result = await get(METADATA_KEY, { access: 'private' as const });
-      if (result && result.stream) {
+      if (result && result.blob && result.stream) {
         const content = await result.stream.getReader().read();
         if (content && !content.done) {
           const data = new TextDecoder().decode(content.value);
-          allMetadata = JSON.parse(data);
+          try {
+            allMetadata = JSON.parse(data);
+          } catch {
+            allMetadata = {};
+          }
         }
       }
     } catch {
-      // 文件不存在，使用空对象
+      allMetadata = {};
     }
     
     const existing = allMetadata[filename] || {
@@ -57,7 +65,7 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
       allowOverwrite: true
     });
   } catch (error) {
-    console.error('Failed to set file metadata:', error);
+    console.error('setMetadata error:', error);
     throw error;
   }
 }
@@ -72,14 +80,25 @@ export async function toggleHidden(filename: string): Promise<boolean> {
 export async function getAllMetadata(): Promise<Record<string, FileMetadata>> {
   try {
     const result = await get(METADATA_KEY, { access: 'private' as const });
-    if (!result || !result.stream) return {};
+    if (!result || !result.blob || !result.stream) {
+      return {};
+    }
     
     const content = await result.stream.getReader().read();
-    if (!content || content.done) return {};
+    if (!content || content.done) {
+      return {};
+    }
     
     const data = new TextDecoder().decode(content.value);
-    return JSON.parse(data);
-  } catch {
+    const parsed = JSON.parse(data);
+    
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as Record<string, FileMetadata>;
+    }
+    
+    return {};
+  } catch (error) {
+    console.error('getAllMetadata error:', error);
     return {};
   }
 }
