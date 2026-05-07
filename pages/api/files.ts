@@ -1,6 +1,5 @@
 import { list } from '@vercel/blob';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAllMetadata } from '../../utils/fileMetadata';
 
 function isAdmin(req: NextApiRequest): boolean {
   const cookies = req.headers.cookie || '';
@@ -8,46 +7,33 @@ function isAdmin(req: NextApiRequest): boolean {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
- if (req.method !== 'GET') {
- return res.status(405).json({ status: 'error', message: 'Method not allowed' });
- }
+  if (req.method !== 'GET') {
+    return res.status(405).json({ status: 'error', message: 'Method not allowed' });
+  }
 
- try {
- const { blobs } = await list();
- const metadata = await getAllMetadata();
- const admin = isAdmin(req);
- 
- const files = blobs
- .filter(blob => !blob.pathname.endsWith('.gitkeep') && blob.pathname !== 'fileMetadata.json')
- .map(blob => {
- const fileMetadata = metadata[blob.pathname];
- const hidden = fileMetadata?.hidden || false;
- return {
- name: blob.pathname,
- size: blob.size,
- size_str: formatSize(blob.size),
- mtime: new Date(blob.uploadedAt).toLocaleString('zh-CN'),
- url: blob.url || '',
- hidden: hidden,
- };
- })
- .filter(file => {
- // 如果是管理员，显示所有文件；否则只显示未隐藏的文件
- if (admin) {
- return true;
- }
- return !file.hidden;
- });
+  try {
+    const { blobs } = await list();
+    const admin = isAdmin(req);
+    
+    const files = blobs
+      .filter(blob => !blob.pathname.endsWith('.gitkeep'))
+      .map(blob => ({
+        name: blob.pathname,
+        size: blob.size,
+        size_str: formatSize(blob.size),
+        mtime: new Date(blob.uploadedAt).toLocaleString('zh-CN'),
+        url: blob.url || '',
+      }));
 
- return res.status(200).json({ status: 'success', files, admin });
- } catch (error) {
- console.error('List files error:', error);
- return res.status(500).json({ status: 'error', message: '获取文件列表失败' });
- }
+    return res.status(200).json({ status: 'success', files, admin });
+  } catch (error) {
+    console.error('List files error:', error);
+    return res.status(500).json({ status: 'error', message: '获取文件列表失败' });
+  }
 }
 
 function formatSize(bytes: number): string {
- if (bytes < 1024) return `${bytes} B`;
- if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
- return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }

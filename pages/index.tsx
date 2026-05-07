@@ -5,7 +5,6 @@ interface FileItem {
   size: number
   size_str: string
   mtime: string
-  hidden: boolean
 }
 
 export default function Home() {
@@ -184,9 +183,6 @@ export default function Home() {
         setShowLoginModal(false)
         setUsername('')
         setPassword('')
-        setTimeout(() => {
-          window.location.reload()
-        }, 300)
       }
     } catch (error) {
       showMessage('登录失败', 'error')
@@ -202,9 +198,6 @@ export default function Home() {
       showMessage(result.message, result.status === 'success' ? 'success' : 'error')
       if (result.status === 'success') {
         setIsAdmin(false)
-        setTimeout(() => {
-          window.location.reload()
-        }, 300)
       }
     } catch (error) {
       showMessage('退出失败', 'error')
@@ -228,34 +221,6 @@ export default function Home() {
       }
     } catch (error) {
       showMessage('删除失败', 'error')
-    }
-  }
-
-  const handleToggleHidden = async (filename: string, currentHidden: boolean) => {
-    try {
-      const targetHidden = !currentHidden
-      
-      setFiles(prevFiles => prevFiles.map(file => 
-        file.name === filename ? { ...file, hidden: targetHidden } : file
-      ))
-      
-      const response = await fetch('/api/admin/toggleHidden', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, hidden: targetHidden }),
-      })
-      const result = await response.json()
-      showMessage(result.message, result.status === 'success' ? 'success' : 'error')
-      if (result.status !== 'success') {
-        setFiles(prevFiles => prevFiles.map(file => 
-          file.name === filename ? { ...file, hidden: currentHidden } : file
-        ))
-      }
-    } catch (error) {
-      showMessage('操作失败', 'error')
-      setFiles(prevFiles => prevFiles.map(file => 
-        file.name === filename ? { ...file, hidden: currentHidden } : file
-      ))
     }
   }
 
@@ -360,28 +325,13 @@ export default function Home() {
           <div className="file-list">
             {files.length > 0 ? (
               files.map((file, index) => (
-                <div 
-                  key={`${file.name}-${index}`} 
-                  className="file-item"
-                  style={{ opacity: file.hidden && isAdmin ? 0.5 : 1 }}
-                >
+                <div key={`${file.name}-${index}`} className="file-item">
                   <div className="file-info">
                     <div className="file-icon">
-                      {file.hidden && isAdmin ? (
-                        <i className="fas fa-eye-slash" style={{ color: '#95a5a6' }}></i>
-                      ) : (
-                        <i className="fas fa-file-alt"></i>
-                      )}
+                      <i className="fas fa-file-alt"></i>
                     </div>
                     <div className="file-details">
-                      <h4>
-                        {file.name}
-                        {file.hidden && isAdmin && (
-                          <span style={{ color: '#95a5a6', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
-                            (隐藏)
-                          </span>
-                        )}
-                      </h4>
+                      <h4>{file.name}</h4>
                       <div className="file-meta">
                         <span>
                           <i className="fas fa-clock"></i> {file.mtime}
@@ -397,22 +347,13 @@ export default function Home() {
                       <i className="fas fa-download"></i> 下载
                     </a>
                     {isAdmin && (
-                      <>
-                        <button 
-                          className="btn" 
-                          onClick={() => handleToggleHidden(file.name, file.hidden)}
-                          style={{ background: file.hidden ? '#3498db' : '#f39c12' }}
-                        >
-                          <i className={`fas ${file.hidden ? 'fa-eye' : 'fa-eye-slash'}`}></i> {file.hidden ? '显示' : '隐藏'}
-                        </button>
-                        <button 
-                          className="btn" 
-                          onClick={() => handleDeleteFile(file.name)}
-                          style={{ background: '#e74c3c' }}
-                        >
-                          <i className="fas fa-trash"></i> 删除
-                        </button>
-                      </>
+                      <button 
+                        className="btn" 
+                        onClick={() => handleDeleteFile(file.name)}
+                        style={{ background: '#e74c3c' }}
+                      >
+                        <i className="fas fa-trash"></i> 删除
+                      </button>
                     )}
                   </div>
                 </div>
