@@ -12,12 +12,9 @@ const METADATA_KEY = 'fileMetadata.json';
 export async function getMetadata(filename: string): Promise<FileMetadata | null> {
   try {
     const result = await get(METADATA_KEY, { access: 'private' as const });
-    if (!result || !result.blob) return null;
+    if (!result || !result.stream) return null;
     
-    const stream = result.stream;
-    if (!stream) return null;
-    
-    const content = await stream.getReader().read();
+    const content = await result.stream.getReader().read();
     if (!content || content.done) return null;
     
     const data = new TextDecoder().decode(content.value);
@@ -35,19 +32,15 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
     
     try {
       const result = await get(METADATA_KEY, { access: 'private' as const });
-      if (result && result.blob && result.stream) {
+      if (result && result.stream) {
         const content = await result.stream.getReader().read();
         if (content && !content.done) {
           const data = new TextDecoder().decode(content.value);
-          try {
-            allMetadata = JSON.parse(data);
-          } catch {
-            allMetadata = {};
-          }
+          allMetadata = JSON.parse(data);
         }
       }
-    } catch {
-      allMetadata = {};
+    } catch (error) {
+      console.log('Metadata file not found, creating new:', error);
     }
     
     const existing = allMetadata[filename] || {
@@ -65,7 +58,7 @@ export async function setMetadata(filename: string, metadata: Partial<FileMetada
       allowOverwrite: true
     });
   } catch (error) {
-    console.error('setMetadata error:', error);
+    console.error('Failed to set file metadata:', error);
     throw error;
   }
 }
@@ -80,23 +73,21 @@ export async function toggleHidden(filename: string): Promise<boolean> {
 export async function getAllMetadata(): Promise<Record<string, FileMetadata>> {
   try {
     const result = await get(METADATA_KEY, { access: 'private' as const });
-    if (!result || !result.blob || !result.stream) {
+    if (!result || !result.stream) {
+      console.log('No metadata file found or no stream available');
       return {};
     }
     
     const content = await result.stream.getReader().read();
     if (!content || content.done) {
+      console.log('Empty metadata stream');
       return {};
     }
     
     const data = new TextDecoder().decode(content.value);
-    const parsed = JSON.parse(data);
-    
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as Record<string, FileMetadata>;
-    }
-    
-    return {};
+    const metadata = JSON.parse(data);
+    console.log('Loaded metadata:', JSON.stringify(metadata));
+    return metadata;
   } catch (error) {
     console.error('getAllMetadata error:', error);
     return {};
