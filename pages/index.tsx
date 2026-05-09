@@ -245,6 +245,15 @@ export default function Home() {
     fetchServerFiles(dir)
   }
 
+  const goToParentDir = () => {
+    if (serverFilesPath === '.') return;
+    
+    const pathParts = serverFilesPath.split('/');
+    pathParts.pop();
+    const parentPath = pathParts.join('/') || '.';
+    fetchServerFiles(parentPath);
+  }
+
   const handleExecuteCommand = async () => {
     if (!command.trim()) {
       showMessage('请输入命令', 'error')
@@ -551,9 +560,18 @@ export default function Home() {
           
           {showServerFiles && (
             <div style={{ marginTop: '1rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <span style={{ color: '#666', fontSize: '0.9rem' }}>当前路径:</span>
                 <span style={{ marginLeft: '0.5rem', fontFamily: 'monospace' }}>{serverFilesPath}</span>
+                {serverFilesPath !== '.' && (
+                  <button 
+                    className="btn" 
+                    onClick={() => goToParentDir()}
+                    style={{ background: '#95a5a6', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                  >
+                    <i className="fas fa-arrow-up"></i> 返回上级
+                  </button>
+                )}
               </div>
               
               <div style={{ 

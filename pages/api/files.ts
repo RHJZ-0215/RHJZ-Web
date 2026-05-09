@@ -16,7 +16,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const admin = isAdmin(req);
     
     const files = blobs
-      .filter(blob => admin || !blob.pathname.endsWith('.gitkeep'))
+      .filter(blob => {
+        // 管理员可以看到所有文件，包括 .gitkeep
+        if (admin) {
+          return true;
+        }
+        // 普通用户看不到 .gitkeep 文件
+        return !blob.pathname.endsWith('.gitkeep');
+      })
       .map(blob => ({
         name: blob.pathname,
         size: blob.size,
