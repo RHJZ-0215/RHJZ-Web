@@ -26,6 +26,13 @@ export default function Home() {
   const [showServerFiles, setShowServerFiles] = useState(false)
   const [serverFiles, setServerFiles] = useState<any[]>([])
   const [serverFilesPath, setServerFilesPath] = useState('.')
+  const [showCreateModal, setShowCreateModal] = useState<'file' | 'directory' | null>(null)
+  const [newItemName, setNewItemName] = useState('')
+  const [showFileEditor, setShowFileEditor] = useState(false)
+  const [editingFile, setEditingFile] = useState('')
+  const [editingContent, setEditingContent] = useState('')
+  const [showBlobStorage, setShowBlobStorage] = useState(false)
+  const [blobFiles, setBlobFiles] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAreaRef = useRef<HTMLDivElement>(null)
 
@@ -252,6 +259,80 @@ export default function Home() {
     pathParts.pop();
     const parentPath = pathParts.join('/') || '.';
     fetchServerFiles(parentPath);
+  }
+
+  const openFileEditor = async (filePath: string) => {
+    try {
+      const response = await fetch(`/api/admin/fileContent?filePath=${encodeURIComponent(filePath)}`);
+      const result = await response.json();
+      if (result.status === 'success') {
+        setEditingFile(filePath);
+        setEditingContent(result.content);
+        setShowFileEditor(true);
+      } else {
+        showMessage(result.message, 'error');
+      }
+    } catch (error) {
+      showMessage('打开文件失败', 'error');
+    }
+  }
+
+  const saveFile = async () => {
+    try {
+      const response = await fetch(`/api/admin/fileContent?filePath=${encodeURIComponent(editingFile)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editingContent }),
+      });
+      const result = await response.json();
+      showMessage(result.message, result.status === 'success' ? 'success' : 'error');
+      if (result.status === 'success') {
+        setShowFileEditor(false);
+        fetchServerFiles(serverFilesPath);
+      }
+    } catch (error) {
+      showMessage('保存文件失败', 'error');
+    }
+  }
+
+  const createNewItem = async () => {
+    if (!newItemName.trim()) {
+      showMessage('请输入名称', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/createItem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: showCreateModal,
+          name: newItemName,
+          parentDir: serverFilesPath === '.' ? '' : serverFilesPath,
+        }),
+      });
+      const result = await response.json();
+      showMessage(result.message, result.status === 'success' ? 'success' : 'error');
+      if (result.status === 'success') {
+        setShowCreateModal(null);
+        setNewItemName('');
+        fetchServerFiles(serverFilesPath);
+      }
+    } catch (error) {
+      showMessage('创建失败', 'error');
+    }
+  }
+
+  const fetchBlobStorage = async () => {
+    try {
+      const response = await fetch('/api/admin/blobStorage');
+      const result = await response.json();
+      if (result.status === 'success') {
+        setBlobFiles(result.files);
+      }
+    } catch (error) {
+      showMessage('获取Blob存储失败', 'error');
+    }
   }
 
   const handleExecuteCommand = async () => {
@@ -560,7 +641,7 @@ export default function Home() {
           
           {showServerFiles && (
             <div style={{ marginTop: '1rem' }}>
-              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <span style={{ color: '#666', fontSize: '0.9rem' }}>当前路径:</span>
                 <span style={{ marginLeft: '0.5rem', fontFamily: 'monospace' }}>{serverFilesPath}</span>
                 {serverFilesPath !== '.' && (
@@ -572,6 +653,20 @@ export default function Home() {
                     <i className="fas fa-arrow-up"></i> 返回上级
                   </button>
                 )}
+                <button 
+                  className="btn" 
+                  onClick={() => setShowCreateModal('file')}
+                  style={{ background: '#2ecc71', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                >
+                  <i className="fas fa-file-plus"></i> 新建文件
+                </button>
+                <button 
+                  className="btn" 
+                  onClick={() => setShowCreateModal('directory')}
+                  style={{ background: '#f39c12', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                >
+                  <i className="fas fa-folder-plus"></i> 新建目录
+                </button>
               </div>
               
               <div style={{ 
@@ -592,14 +687,18 @@ export default function Home() {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          cursor: file.type === 'directory' ? 'pointer' : 'default'
+                          cursor: file.type === 'directory' ? 'pointer' : 'pointer'
                         }}
                         onClick={() => file.type === 'directory' && navigateToServerDir(file.path)}
+                        onDoubleClick={() => file.type === 'file' && openFileEditor(file.path)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
                              style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
                           <span>{file.name}</span>
+                          {file.type === 'file' && (
+                            <span style={{ color: '#95a5a6', fontSize: '0.8rem' }}>(双击编辑)</span>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
                           {file.size !== undefined && <span>{formatSize(file.size)}</span>}
@@ -610,6 +709,65 @@ export default function Home() {
                   </div>
                 ) : (
                   <p style={{ textAlign: 'center', color: '#666' }}>目录为空</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>
+              <i className="fas fa-cloud"></i> Vercel Blob存储查看
+            </h2>
+            <button 
+              className="btn" 
+              onClick={() => { 
+                setShowBlobStorage(!showBlobStorage); 
+                if (!showBlobStorage) fetchBlobStorage(); 
+              }}
+              style={{ background: showBlobStorage ? '#666' : '#3498db' }}
+            >
+              <i className="fas fa-eye"></i> {showBlobStorage ? '隐藏' : '查看存储'}
+            </button>
+          </div>
+          
+          {showBlobStorage && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ 
+                background: '#f8f9fa', 
+                padding: '1rem', 
+                borderRadius: '6px', 
+                maxHeight: '400px',
+                overflowY: 'auto'
+              }}>
+                {blobFiles.length > 0 ? (
+                  <div>
+                    {blobFiles.map((file, index) => (
+                      <div 
+                        key={`${file.name}-${index}`} 
+                        style={{ 
+                          padding: '0.5rem', 
+                          borderBottom: '1px solid #e9ecef',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
+                             style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                          <span>{file.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                          {file.size_str && <span>{file.size_str}</span>}
+                          {file.mtime && <span>{file.mtime}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: '#666' }}>存储为空</p>
                 )}
               </div>
             </div>
@@ -675,6 +833,123 @@ export default function Home() {
                 style={{ flex: 1 }}
               >
                 登录
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000 
+        }}>
+          <div style={{ 
+            background: 'white', 
+            padding: '2rem', 
+            borderRadius: '12px', 
+            width: '90%', 
+            maxWidth: '400px' 
+          }}>
+            <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>
+              <i className={`fas ${showCreateModal === 'file' ? 'fa-file-plus' : 'fa-folder-plus'}`}></i> 
+              新建{showCreateModal === 'file' ? '文件' : '目录'}
+            </h2>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#333' }}>名称</label>
+              <input
+                type="text"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder={`请输入${showCreateModal === 'file' ? '文件' : '目录'}名称`}
+                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                className="btn" 
+                onClick={() => { setShowCreateModal(null); setNewItemName('') }}
+                style={{ flex: 1, background: '#666' }}
+              >
+                取消
+              </button>
+              <button 
+                className="btn btn-upload" 
+                onClick={createNewItem}
+                style={{ flex: 1 }}
+              >
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFileEditor && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000 
+        }}>
+          <div style={{ 
+            background: 'white', 
+            padding: '2rem', 
+            borderRadius: '12px', 
+            width: '90%', 
+            maxWidth: '800px',
+            maxHeight: '80vh'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: '#2c3e50' }}>
+                <i className="fas fa-file-edit"></i> 编辑文件
+              </h2>
+              <span style={{ color: '#666', fontSize: '0.9rem', fontFamily: 'monospace' }}>{editingFile}</span>
+            </div>
+            <textarea
+              value={editingContent}
+              onChange={(e) => setEditingContent(e.target.value)}
+              style={{ 
+                width: '100%', 
+                height: '300px', 
+                padding: '1rem', 
+                borderRadius: '6px', 
+                border: '1px solid #ddd',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                resize: 'vertical'
+              }}
+              placeholder="文件内容..."
+            />
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button 
+                className="btn" 
+                onClick={() => { setShowFileEditor(false); setEditingFile(''); setEditingContent('') }}
+                style={{ flex: 1, background: '#666' }}
+              >
+                取消
+              </button>
+              <button 
+                className="btn btn-upload" 
+                onClick={saveFile}
+                style={{ flex: 1 }}
+              >
+                保存
               </button>
             </div>
           </div>
