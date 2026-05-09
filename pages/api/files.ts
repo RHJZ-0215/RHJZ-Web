@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const admin = isAdmin(req);
     
     const files = blobs
-      .filter(blob => !blob.pathname.endsWith('.gitkeep'))
+      .filter(blob => admin || !blob.pathname.endsWith('.gitkeep'))
       .map(blob => ({
         name: blob.pathname,
         size: blob.size,

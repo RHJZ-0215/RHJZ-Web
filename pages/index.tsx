@@ -23,6 +23,9 @@ export default function Home() {
   const [logs, setLogs] = useState<any[]>([])
   const [logTypeFilter, setLogTypeFilter] = useState('all')
   const [showLogs, setShowLogs] = useState(false)
+  const [showServerFiles, setShowServerFiles] = useState(false)
+  const [serverFiles, setServerFiles] = useState<any[]>([])
+  const [serverFilesPath, setServerFilesPath] = useState('.')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAreaRef = useRef<HTMLDivElement>(null)
 
@@ -222,6 +225,24 @@ export default function Home() {
     } catch (error) {
       showMessage('删除失败', 'error')
     }
+  }
+
+  const fetchServerFiles = async (dir?: string) => {
+    try {
+      const url = dir ? `/api/admin/serverFiles?dir=${encodeURIComponent(dir)}` : '/api/admin/serverFiles'
+      const response = await fetch(url)
+      const result = await response.json()
+      if (result.status === 'success') {
+        setServerFiles(result.files)
+        setServerFilesPath(result.relativePath || '.')
+      }
+    } catch (error) {
+      showMessage('获取服务器文件失败', 'error')
+    }
+  }
+
+  const navigateToServerDir = (dir: string) => {
+    fetchServerFiles(dir)
   }
 
   const handleExecuteCommand = async () => {
@@ -505,6 +526,72 @@ export default function Home() {
                   </div>
                 ) : (
                   <p style={{ textAlign: 'center', color: '#666' }}>暂无日志记录</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>
+              <i className="fas fa-server"></i> 服务器文件浏览
+            </h2>
+            <button 
+              className="btn" 
+              onClick={() => { 
+                setShowServerFiles(!showServerFiles); 
+                if (!showServerFiles) fetchServerFiles(); 
+              }}
+              style={{ background: showServerFiles ? '#666' : '#3498db' }}
+            >
+              <i className="fas fa-folder-open"></i> {showServerFiles ? '隐藏' : '浏览文件'}
+            </button>
+          </div>
+          
+          {showServerFiles && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <span style={{ color: '#666', fontSize: '0.9rem' }}>当前路径:</span>
+                <span style={{ marginLeft: '0.5rem', fontFamily: 'monospace' }}>{serverFilesPath}</span>
+              </div>
+              
+              <div style={{ 
+                background: '#f8f9fa', 
+                padding: '1rem', 
+                borderRadius: '6px', 
+                maxHeight: '400px',
+                overflowY: 'auto'
+              }}>
+                {serverFiles.length > 0 ? (
+                  <div>
+                    {serverFiles.map((file) => (
+                      <div 
+                        key={file.path} 
+                        style={{ 
+                          padding: '0.5rem', 
+                          borderBottom: '1px solid #e9ecef',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: file.type === 'directory' ? 'pointer' : 'default'
+                        }}
+                        onClick={() => file.type === 'directory' && navigateToServerDir(file.path)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
+                             style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                          <span>{file.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                          {file.size !== undefined && <span>{formatSize(file.size)}</span>}
+                          {file.mtime && <span>{file.mtime}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'center', color: '#666' }}>目录为空</p>
                 )}
               </div>
             </div>
