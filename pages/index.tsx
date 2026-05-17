@@ -804,6 +804,12 @@ export default function Home() {
   const [downloadProgress, setDownloadProgress] = useState('')
   const [uploadFileName, setUploadFileName] = useState('')
 
+  useEffect(() => {
+    if (activeTab === 'remoteServer' && remoteServerAuthenticated) {
+      fetchClients()
+    }
+  }, [activeTab, remoteServerAuthenticated])
+
   const fetchClients = async () => {
     try {
       const response = await fetch('/api/admin/clients?action=list')
