@@ -858,7 +858,7 @@ export default function Home() {
     }
   }
 
-  const getClientDirectory = async (clientId: string, path: string = '.') => {
+  const getClientDirectory = async (clientId: string, path: string = 'C:\\') => {
     try {
       await sendRemoteCommand(clientId, path, 'directory')
       setTimeout(async () => {
@@ -966,8 +966,8 @@ export default function Home() {
   }
 
   const handleGoBack = () => {
-    if (currentPath && currentPath !== '.' && currentPath !== '/') {
-      const parentPath = currentPath.substring(0, currentPath.lastIndexOf('\\')) || '.'
+    if (currentPath && currentPath !== '.' && currentPath !== '/' && !currentPath.match(/^[A-Za-z]:\\?$/)) {
+      const parentPath = currentPath.substring(0, currentPath.lastIndexOf('\\')) || 'C:\\'
       getClientDirectory(selectedClient!.id, parentPath)
     }
   }
@@ -1225,17 +1225,17 @@ export default function Home() {
                         <button 
                           className="btn btn-sm" 
                           onClick={handleGoBack}
-                          disabled={currentPath === '.' || currentPath === '/'}
-                          style={{ background: '#95a5a6', opacity: (currentPath === '.' || currentPath === '/') ? 0.5 : 1, cursor: (currentPath === '.' || currentPath === '/') ? 'not-allowed' : 'pointer' }}
+                          disabled={!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)}
+                          style={{ background: '#95a5a6', opacity: (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 0.5 : 1, cursor: (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 'not-allowed' : 'pointer' }}
                         >
                           <i className="fas fa-arrow-left"></i> 返回
                         </button>
                         <button 
                           className="btn btn-sm" 
-                          onClick={() => getClientDirectory(selectedClient.id)}
+                          onClick={() => getClientDirectory(selectedClient.id, 'drives')}
                           style={{ background: '#3498db' }}
                         >
-                          <i className="fas fa-refresh"></i> 刷新
+                          <i className="fas fa-hard-drive"></i> 所有驱动器
                         </button>
                       </div>
                     </div>
