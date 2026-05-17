@@ -68,14 +68,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'register': {
       try {
         const { fields } = await parseForm(req)
-        const bodyField = fields.body
-        let bodyStr = '{}'
-        if (typeof bodyField === 'string') {
-          bodyStr = bodyField
-        } else if (Array.isArray(bodyField) && bodyField.length > 0) {
-          bodyStr = bodyField[0] as string
-        }
-        const body = JSON.parse(bodyStr)
+        const bodyStr = Array.isArray(fields.body) ? fields.body[0] : fields.body
+        const body = JSON.parse(bodyStr as string)
         
         const { id: clientId, hostname, os, username, cpu, ram } = body
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
@@ -172,14 +166,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       try {
         const { files } = await parseForm(req)
-        const fileField = files.file
-        let file: formidable.File | null = null
-        
-        if (typeof fileField === 'object' && !(fileField instanceof Array)) {
-          file = fileField as formidable.File
-        } else if (Array.isArray(fileField) && fileField.length > 0) {
-          file = fileField[0] as formidable.File
-        }
+        const fileArray = files.file as formidable.File[]
+        const file = fileArray ? fileArray[0] : undefined
         
         if (!file) {
           res.status(400).json({ status: 'error', message: '缺少文件' })
