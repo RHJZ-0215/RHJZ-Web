@@ -921,7 +921,7 @@ export default function Home() {
     })
   }
 
-  const handleDeleteClientFile = async (clientId: string, filePath: string) => {
+  const handleDeleteFile = async (clientId: string, filePath: string) => {
     if (!confirm(`确定要删除文件 "${filePath}" 吗？此操作不可恢复！`)) return
     try {
       await sendRemoteCommand(clientId, filePath, 'delete')
@@ -1315,7 +1315,7 @@ export default function Home() {
                                 </button>
                                 <button 
                                   className="btn btn-sm danger" 
-                                  onClick={() => handleDeleteClientFile(selectedClient.id, item.path)}
+                                  onClick={() => handleDeleteFile(selectedClient.id, item.path)}
                                 >
                                   <i className="fas fa-trash"></i> 删除
                                 </button>
