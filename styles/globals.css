@@ -446,6 +446,14 @@ header p {
   cursor: pointer;
   transition: all 0.3s ease;
   border-left: 3px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.client-content {
+  flex: 1;
+  cursor: pointer;
 }
 
 .client-item:hover {
@@ -459,6 +467,16 @@ header p {
 
 .client-item.offline {
   opacity: 0.6;
+}
+
+.delete-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  padding: 0.4rem 0.6rem;
+}
+
+.client-item:hover .delete-btn {
+  opacity: 1;
 }
 
 .client-status {

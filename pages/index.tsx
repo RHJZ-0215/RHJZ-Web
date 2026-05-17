@@ -985,6 +985,25 @@ export default function Home() {
     setTimeout(() => fetchClients(), 1000)
   }
 
+  const handleRemoveClient = async (clientId: string, hostname: string) => {
+    if (!confirm(`确定要删除客户端 "${hostname}" 吗？此操作将从服务端移除该客户端记录，但不会影响客户端本身。`)) return
+    try {
+      const response = await fetch(`/api/admin/clients?action=remove&id=${clientId}`)
+      const result = await response.json()
+      if (result.status === 'success') {
+        showMessage('客户端已删除', 'success')
+        if (selectedClient?.id === clientId) {
+          setSelectedClient(null)
+        }
+        fetchClients()
+      } else {
+        showMessage('删除失败', 'error')
+      }
+    } catch (error) {
+      showMessage('删除失败', 'error')
+    }
+  }
+
   const renderRemoteServerTab = () => (
     <div className="remote-server-content">
       {!remoteServerAuthenticated ? (
@@ -1053,27 +1072,41 @@ export default function Home() {
                   <div 
                     key={client.id}
                     className={`client-item ${client.status === 'online' ? 'online' : 'offline'} ${selectedClient?.id === client.id ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedClient(client)
-                      setScreenshotUrl('')
-                      setScreenViewActive(false)
-                      setDirectoryItems([])
-                      setProcesses([])
-                      setCommandResult('')
-                    }}
                   >
-                    <div className="client-status">
-                      <span className={`status-dot ${client.status === 'online' ? 'online' : 'offline'}`}></span>
-                      <span className="client-hostname">{client.hostname}</span>
+                    <div 
+                      className="client-content"
+                      onClick={() => {
+                        setSelectedClient(client)
+                        setScreenshotUrl('')
+                        setScreenViewActive(false)
+                        setDirectoryItems([])
+                        setProcesses([])
+                        setCommandResult('')
+                      }}
+                    >
+                      <div className="client-status">
+                        <span className={`status-dot ${client.status === 'online' ? 'online' : 'offline'}`}></span>
+                        <span className="client-hostname">{client.hostname}</span>
+                      </div>
+                      <div className="client-info">
+                        <span className="client-ip">{client.ip}</span>
+                        <span className="client-location">{client.city}, {client.country}</span>
+                      </div>
+                      <div className="client-meta">
+                        <span>{client.os}</span>
+                        <span>{client.username}</span>
+                      </div>
                     </div>
-                    <div className="client-info">
-                      <span className="client-ip">{client.ip}</span>
-                      <span className="client-location">{client.city}, {client.country}</span>
-                    </div>
-                    <div className="client-meta">
-                      <span>{client.os}</span>
-                      <span>{client.username}</span>
-                    </div>
+                    <button 
+                      className="btn btn-sm danger delete-btn" 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveClient(client.id, client.hostname)
+                      }}
+                      title="删除客户端"
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
                   </div>
                 ))}
                 {clients.length === 0 && (
