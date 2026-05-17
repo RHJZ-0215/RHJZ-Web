@@ -1076,6 +1076,7 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="remote-server-main">
             <div className="client-list-container">
               <div className="card client-list-card">
                 <h3>
@@ -1409,6 +1410,7 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
           </div>
         </div>
       )}

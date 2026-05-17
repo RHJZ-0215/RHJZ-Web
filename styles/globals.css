@@ -410,10 +410,16 @@ header p {
 
 .remote-server-dashboard {
   animation: fadeIn 0.3s ease forwards;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.remote-server-main {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 1.5rem;
-  height: calc(100vh - 280px);
+  max-height: calc(100vh - 380px);
 }
 
 .client-list-container {

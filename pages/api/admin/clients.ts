@@ -133,12 +133,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const { url } = req.body
-      screenshots.set(clientId, url)
+      const files = (req as any).files
+      if (!files || !files.file) {
+        res.status(400).json({ status: 'error', message: '缺少截图文件' })
+        break
+      }
+      
+      const file = files.file
+      const screenshotData = file.data.toString('base64')
+      const dataUrl = `data:image/jpeg;base64,${screenshotData}`
+      
+      screenshots.set(clientId, dataUrl)
       
       const client = clients.get(clientId)
       if (client) {
-        client.screenshotUrl = url
+        client.screenshotUrl = dataUrl
         clients.set(clientId, client)
       }
       
