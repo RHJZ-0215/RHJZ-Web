@@ -7,7 +7,10 @@ interface FileItem {
   mtime: string
 }
 
+type ActiveTab = 'home' | 'fileServer' | 'remoteServer'
+
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('home')
   const [files, setFiles] = useState<FileItem[]>([])
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
@@ -33,6 +36,11 @@ export default function Home() {
   const [editingContent, setEditingContent] = useState('')
   const [showBlobStorage, setShowBlobStorage] = useState(false)
   const [blobFiles, setBlobFiles] = useState<any[]>([])
+  
+  const [remoteServerPassword, setRemoteServerPassword] = useState('')
+  const [remoteServerAuthenticated, setRemoteServerAuthenticated] = useState(false)
+  const [remoteServerPasswordError, setRemoteServerPasswordError] = useState('')
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAreaRef = useRef<HTMLDivElement>(null)
 
@@ -348,7 +356,6 @@ export default function Home() {
       })
       const result = await response.json()
       
-      // 更新当前目录
       if (result.cwd) {
         setCurrentDir(result.cwd)
       }
@@ -369,26 +376,74 @@ export default function Home() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
 
-  return (
-    <div className="container">
-      <header>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1>文件上传下载系统—Made By：君卓</h1>
-            <p>君卓下载库</p>
-          </div>
-          {isAdmin ? (
-            <button className="btn btn-logout" onClick={handleLogout} style={{ background: '#e74c3c' }}>
-              <i className="fas fa-sign-out-alt"></i> 退出管理员
-            </button>
-          ) : (
-            <button className="btn btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#9b59b6' }}>
-              <i className="fas fa-user-shield"></i> 登录管理员
-            </button>
-          )}
-        </div>
-      </header>
+  const handleRemoteServerLogin = () => {
+    if (remoteServerPassword === 'rhjz') {
+      setRemoteServerAuthenticated(true)
+      setRemoteServerPasswordError('')
+    } else {
+      setRemoteServerPasswordError('密码错误，请输入正确的密码')
+    }
+  }
 
+  const handleRemoteServerLogout = () => {
+    setRemoteServerAuthenticated(false)
+    setRemoteServerPassword('')
+    setRemoteServerPasswordError('')
+  }
+
+  const renderHomeTab = () => (
+    <div className="home-content">
+      <div className="hero-section">
+        <h2>欢迎来到君卓博客</h2>
+        <p>探索更多功能和服务</p>
+      </div>
+      
+      <div className="features-grid">
+        <div className="feature-card" onClick={() => setActiveTab('fileServer')}>
+          <div className="feature-icon">
+            <i className="fas fa-cloud-upload-alt"></i>
+          </div>
+          <h3>文件上传下载服务器</h3>
+          <p>安全、便捷的文件管理服务</p>
+        </div>
+        
+        <div className="feature-card" onClick={() => setActiveTab('remoteServer')}>
+          <div className="feature-icon">
+            <i className="fas fa-server"></i>
+          </div>
+          <h3>远程服务端</h3>
+          <p>受密码保护的远程管理服务</p>
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div className="admin-section">
+          <h3>管理员功能</h3>
+          <div className="admin-cards">
+            <div className="admin-card" onClick={() => { setActiveTab('fileServer'); setShowLogs(true); fetchLogs(); }}>
+              <i className="fas fa-file-alt"></i>
+              <span>系统日志</span>
+            </div>
+            <div className="admin-card" onClick={() => { setActiveTab('fileServer'); setShowServerFiles(true); fetchServerFiles(); }}>
+              <i className="fas fa-folder-open"></i>
+              <span>服务器文件</span>
+            </div>
+            <div className="admin-card" onClick={() => { setActiveTab('fileServer'); setShowBlobStorage(true); fetchBlobStorage(); }}>
+              <i className="fas fa-cloud"></i>
+              <span>Blob存储</span>
+            </div>
+            <div className="admin-card" onClick={() => setShowCmdModal(true)}>
+              <i className="fas fa-terminal"></i>
+              <span>命令执行</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const renderFileServerTab = () => (
+    <div className="file-server-content">
       <div className="main-content">
         <div className="card">
           <h2>
@@ -482,299 +537,413 @@ export default function Home() {
       {isAdmin && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div className="card">
-            <h2>
-              <i className="fas fa-terminal"></i> 命令执行（管理员）
-            </h2>
-          {currentDir && (
-            <div style={{ 
-              background: '#f8f9fa', 
-              padding: '0.5rem 1rem', 
-              borderRadius: '6px', 
-              marginBottom: '1rem',
-              fontFamily: 'monospace',
-              color: '#333'
-            }}>
-              <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2>
+                <i className="fas fa-file-alt"></i> 系统日志
+              </h2>
+              <button 
+                className="btn" 
+                onClick={() => { 
+                  setShowLogs(!showLogs); 
+                  if (!showLogs) fetchLogs(); 
+                }}
+                style={{ background: showLogs ? '#666' : '#3498db' }}
+              >
+                <i className="fas fa-eye"></i> {showLogs ? '隐藏日志' : '查看日志'}
+              </button>
             </div>
-          )}
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-            <input
-              type="text"
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              placeholder="输入命令，如: dir, ipconfig"
-              style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
-            />
-            <button className="btn" onClick={handleExecuteCommand} style={{ background: '#9b59b6' }}>
-              <i className="fas fa-play"></i> 执行
-            </button>
-          </div>
-          {cmdResult && (
-            <div style={{ 
-              background: '#1a1a2e', 
-              color: '#00ff00', 
-              padding: '1rem', 
-              borderRadius: '6px', 
-              fontFamily: 'monospace',
-              maxHeight: '300px',
-              overflowY: 'auto'
-            }}>
-              <pre>{cmdResult}</pre>
-            </div>
-          )}
-        </div>
-
-        <div className="card" style={{ marginTop: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2>
-              <i className="fas fa-file-alt"></i> 系统日志
-            </h2>
-            <button 
-              className="btn" 
-              onClick={() => { 
-                setShowLogs(!showLogs); 
-                if (!showLogs) fetchLogs(); 
-              }}
-              style={{ background: showLogs ? '#666' : '#3498db' }}
-            >
-              <i className="fas fa-eye"></i> {showLogs ? '隐藏日志' : '查看日志'}
-            </button>
-          </div>
-          
-          {showLogs && (
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                {['all', 'access', 'upload', 'download', 'login', 'logout', 'command', 'error', 'system'].map((type) => (
-                  <button
-                    key={type}
-                    className="btn"
-                    onClick={() => { setLogTypeFilter(type); fetchLogs(); }}
-                    style={{ 
-                      background: logTypeFilter === type ? '#3498db' : '#95a5a6',
-                      padding: '0.3rem 0.8rem',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    {type === 'all' ? '全部' : 
-                     type === 'access' ? '访问' :
-                     type === 'upload' ? '上传' :
-                     type === 'download' ? '下载' :
-                     type === 'login' ? '登录' :
-                     type === 'logout' ? '退出' :
-                     type === 'command' ? '命令' :
-                     type === 'error' ? '错误' : '系统'}
-                  </button>
-                ))}
+            
+            {showLogs && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  {['all', 'access', 'upload', 'download', 'login', 'logout', 'command', 'error', 'system'].map((type) => (
+                    <button
+                      key={type}
+                      className="btn"
+                      onClick={() => { setLogTypeFilter(type); fetchLogs(); }}
+                      style={{ 
+                        background: logTypeFilter === type ? '#3498db' : '#95a5a6',
+                        padding: '0.3rem 0.8rem',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      {type === 'all' ? '全部' : 
+                       type === 'access' ? '访问' :
+                       type === 'upload' ? '上传' :
+                       type === 'download' ? '下载' :
+                       type === 'login' ? '登录' :
+                       type === 'logout' ? '退出' :
+                       type === 'command' ? '命令' :
+                       type === 'error' ? '错误' : '系统'}
+                    </button>
+                  ))}
+                </div>
+                
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  padding: '1rem', 
+                  borderRadius: '6px', 
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  fontFamily: 'monospace',
+                  fontSize: '0.9rem'
+                }}>
+                  {logs.length > 0 ? (
+                    <div>
+                      {logs.map((log) => {
+                        const date = new Date(log.timestamp)
+                        const formattedDate = date.toLocaleString('zh-CN')
+                        const typeColors: Record<string, string> = {
+                          access: '#3498db',
+                          upload: '#2ecc71',
+                          download: '#3498db',
+                          login: '#f39c12',
+                          logout: '#9b59b6',
+                          command: '#1abc9c',
+                          error: '#e74c3c',
+                          system: '#95a5a6'
+                        }
+                        return (
+                          <div key={log.id} style={{ 
+                            padding: '0.5rem', 
+                            borderBottom: '1px solid #e9ecef',
+                            display: 'flex',
+                            gap: '1rem'
+                          }}>
+                            <span style={{ color: '#666', whiteSpace: 'nowrap' }}>[{formattedDate}]</span>
+                            <span style={{ color: typeColors[log.type] || '#333', whiteSpace: 'nowrap' }}>[{log.type === 'access' ? '访问' :
+                               log.type === 'upload' ? '上传' :
+                               log.type === 'download' ? '下载' :
+                               log.type === 'login' ? '登录' :
+                               log.type === 'logout' ? '退出' :
+                               log.type === 'command' ? '命令' :
+                               log.type === 'error' ? '错误' : '系统'}]</span>
+                            <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{log.ip}</span>
+                            <span style={{ fontWeight: '500' }}>{log.action}</span>
+                            <span>{log.details}</span>
+                            {log.username && <span style={{ color: '#9b59b6' }}>(用户: {log.username})</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ textAlign: 'center', color: '#666' }}>暂无日志记录</p>
+                  )}
+                </div>
               </div>
-              
-              <div style={{ 
-                background: '#f8f9fa', 
-                padding: '1rem', 
-                borderRadius: '6px', 
-                maxHeight: '400px',
-                overflowY: 'auto',
-                fontFamily: 'monospace',
-                fontSize: '0.9rem'
-              }}>
-                {logs.length > 0 ? (
-                  <div>
-                    {logs.map((log) => {
-                      const date = new Date(log.timestamp)
-                      const formattedDate = date.toLocaleString('zh-CN')
-                      const typeColors: Record<string, string> = {
-                        access: '#3498db',
-                        upload: '#2ecc71',
-                        download: '#3498db',
-                        login: '#f39c12',
-                        logout: '#9b59b6',
-                        command: '#1abc9c',
-                        error: '#e74c3c',
-                        system: '#95a5a6'
-                      }
-                      return (
-                        <div key={log.id} style={{ 
-                          padding: '0.5rem', 
-                          borderBottom: '1px solid #e9ecef',
-                          display: 'flex',
-                          gap: '1rem'
-                        }}>
-                          <span style={{ color: '#666', whiteSpace: 'nowrap' }}>[{formattedDate}]</span>
-                          <span style={{ color: typeColors[log.type] || '#333', whiteSpace: 'nowrap' }}>[{log.type === 'access' ? '访问' :
-                             log.type === 'upload' ? '上传' :
-                             log.type === 'download' ? '下载' :
-                             log.type === 'login' ? '登录' :
-                             log.type === 'logout' ? '退出' :
-                             log.type === 'command' ? '命令' :
-                             log.type === 'error' ? '错误' : '系统'}]</span>
-                          <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{log.ip}</span>
-                          <span style={{ fontWeight: '500' }}>{log.action}</span>
-                          <span>{log.details}</span>
-                          {log.username && <span style={{ color: '#9b59b6' }}>(用户: {log.username})</span>}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ textAlign: 'center', color: '#666' }}>暂无日志记录</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="card" style={{ marginTop: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2>
-              <i className="fas fa-server"></i> 服务器文件浏览
-            </h2>
-            <button 
-              className="btn" 
-              onClick={() => { 
-                setShowServerFiles(!showServerFiles); 
-                if (!showServerFiles) fetchServerFiles(); 
-              }}
-              style={{ background: showServerFiles ? '#666' : '#3498db' }}
-            >
-              <i className="fas fa-folder-open"></i> {showServerFiles ? '隐藏' : '浏览文件'}
-            </button>
+            )}
           </div>
-          
-          {showServerFiles && (
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <span style={{ color: '#666', fontSize: '0.9rem' }}>当前路径:</span>
-                <span style={{ marginLeft: '0.5rem', fontFamily: 'monospace' }}>{serverFilesPath}</span>
-                {serverFilesPath !== '.' && (
+
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2>
+                <i className="fas fa-server"></i> 服务器文件浏览
+              </h2>
+              <button 
+                className="btn" 
+                onClick={() => { 
+                  setShowServerFiles(!showServerFiles); 
+                  if (!showServerFiles) fetchServerFiles(); 
+                }}
+                style={{ background: showServerFiles ? '#666' : '#3498db' }}
+              >
+                <i className="fas fa-folder-open"></i> {showServerFiles ? '隐藏' : '浏览文件'}
+              </button>
+            </div>
+            
+            {showServerFiles && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <span style={{ color: '#666', fontSize: '0.9rem' }}>当前路径:</span>
+                  <span style={{ marginLeft: '0.5rem', fontFamily: 'monospace' }}>{serverFilesPath}</span>
+                  {serverFilesPath !== '.' && (
+                    <button 
+                      className="btn" 
+                      onClick={() => goToParentDir()}
+                      style={{ background: '#95a5a6', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                    >
+                      <i className="fas fa-arrow-up"></i> 返回上级
+                    </button>
+                  )}
                   <button 
                     className="btn" 
-                    onClick={() => goToParentDir()}
-                    style={{ background: '#95a5a6', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                    onClick={() => setShowCreateModal('file')}
+                    style={{ background: '#2ecc71', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
                   >
-                    <i className="fas fa-arrow-up"></i> 返回上级
+                    <i className="fas fa-file-plus"></i> 新建文件
                   </button>
-                )}
-                <button 
-                  className="btn" 
-                  onClick={() => setShowCreateModal('file')}
-                  style={{ background: '#2ecc71', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
-                >
-                  <i className="fas fa-file-plus"></i> 新建文件
-                </button>
-                <button 
-                  className="btn" 
-                  onClick={() => setShowCreateModal('directory')}
-                  style={{ background: '#f39c12', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
-                >
-                  <i className="fas fa-folder-plus"></i> 新建目录
-                </button>
-              </div>
-              
-              <div style={{ 
-                background: '#f8f9fa', 
-                padding: '1rem', 
-                borderRadius: '6px', 
-                maxHeight: '400px',
-                overflowY: 'auto'
-              }}>
-                {serverFiles.length > 0 ? (
-                  <div>
-                    {serverFiles.map((file) => (
-                      <div 
-                        key={file.path} 
-                        style={{ 
-                          padding: '0.5rem', 
-                          borderBottom: '1px solid #e9ecef',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          cursor: file.type === 'directory' ? 'pointer' : 'pointer'
-                        }}
-                        onClick={() => file.type === 'directory' && navigateToServerDir(file.path)}
-                        onDoubleClick={() => file.type === 'file' && openFileEditor(file.path)}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
-                             style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
-                          <span>{file.name}</span>
-                          {file.type === 'file' && (
-                            <span style={{ color: '#95a5a6', fontSize: '0.8rem' }}>(双击编辑)</span>
-                          )}
+                  <button 
+                    className="btn" 
+                    onClick={() => setShowCreateModal('directory')}
+                    style={{ background: '#f39c12', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                  >
+                    <i className="fas fa-folder-plus"></i> 新建目录
+                  </button>
+                </div>
+                
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  padding: '1rem', 
+                  borderRadius: '6px', 
+                  maxHeight: '400px',
+                  overflowY: 'auto'
+                }}>
+                  {serverFiles.length > 0 ? (
+                    <div>
+                      {serverFiles.map((file) => (
+                        <div 
+                          key={file.path} 
+                          style={{ 
+                            padding: '0.5rem', 
+                            borderBottom: '1px solid #e9ecef',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: file.type === 'directory' ? 'pointer' : 'pointer'
+                          }}
+                          onClick={() => file.type === 'directory' && navigateToServerDir(file.path)}
+                          onDoubleClick={() => file.type === 'file' && openFileEditor(file.path)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
+                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                            <span>{file.name}</span>
+                            {file.type === 'file' && (
+                              <span style={{ color: '#95a5a6', fontSize: '0.8rem' }}>(双击编辑)</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                            {file.size !== undefined && <span>{formatSize(file.size)}</span>}
+                            {file.mtime && <span>{file.mtime}</span>}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
-                          {file.size !== undefined && <span>{formatSize(file.size)}</span>}
-                          {file.mtime && <span>{file.mtime}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ textAlign: 'center', color: '#666' }}>目录为空</p>
-                )}
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ textAlign: 'center', color: '#666' }}>目录为空</p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="card" style={{ marginTop: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2>
+                <i className="fas fa-cloud"></i> Vercel Blob存储查看
+              </h2>
+              <button 
+                className="btn" 
+                onClick={() => { 
+                  setShowBlobStorage(!showBlobStorage); 
+                  if (!showBlobStorage) fetchBlobStorage(); 
+                }}
+                style={{ background: showBlobStorage ? '#666' : '#3498db' }}
+              >
+                <i className="fas fa-eye"></i> {showBlobStorage ? '隐藏' : '查看存储'}
+              </button>
+            </div>
+            
+            {showBlobStorage && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  padding: '1rem', 
+                  borderRadius: '6px', 
+                  maxHeight: '400px',
+                  overflowY: 'auto'
+                }}>
+                  {blobFiles.length > 0 ? (
+                    <div>
+                      {blobFiles.map((file, index) => (
+                        <div 
+                          key={`${file.name}-${index}`} 
+                          style={{ 
+                            padding: '0.5rem', 
+                            borderBottom: '1px solid #e9ecef',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
+                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                            <span>{file.name}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                            {file.size_str && <span>{file.size_str}</span>}
+                            {file.mtime && <span>{file.mtime}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ textAlign: 'center', color: '#666' }}>存储为空</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const renderRemoteServerTab = () => (
+    <div className="remote-server-content">
+      {!remoteServerAuthenticated ? (
+        <div className="auth-container">
+          <div className="auth-card">
             <h2>
-              <i className="fas fa-cloud"></i> Vercel Blob存储查看
+              <i className="fas fa-lock"></i> 远程服务端
+            </h2>
+            <p>请输入密码以访问远程服务端</p>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#333' }}>密码</label>
+              <input
+                type="password"
+                value={remoteServerPassword}
+                onChange={(e) => setRemoteServerPassword(e.target.value)}
+                placeholder="请输入密码"
+                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                onKeyPress={(e) => e.key === 'Enter' && handleRemoteServerLogin()}
+              />
+              {remoteServerPasswordError && (
+                <p style={{ color: '#e74c3c', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                  {remoteServerPasswordError}
+                </p>
+              )}
+            </div>
+            <button 
+              className="btn btn-upload" 
+              onClick={handleRemoteServerLogin}
+              style={{ width: '100%' }}
+            >
+              <i className="fas fa-unlock"></i> 登录
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="remote-server-dashboard">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <h2>
+              <i className="fas fa-server"></i> 远程服务端
             </h2>
             <button 
               className="btn" 
-              onClick={() => { 
-                setShowBlobStorage(!showBlobStorage); 
-                if (!showBlobStorage) fetchBlobStorage(); 
-              }}
-              style={{ background: showBlobStorage ? '#666' : '#3498db' }}
+              onClick={handleRemoteServerLogout}
+              style={{ background: '#e74c3c' }}
             >
-              <i className="fas fa-eye"></i> {showBlobStorage ? '隐藏' : '查看存储'}
+              <i className="fas fa-lock"></i> 退出
             </button>
           </div>
           
-          {showBlobStorage && (
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ 
-                background: '#f8f9fa', 
-                padding: '1rem', 
-                borderRadius: '6px', 
-                maxHeight: '400px',
-                overflowY: 'auto'
-              }}>
-                {blobFiles.length > 0 ? (
-                  <div>
-                    {blobFiles.map((file, index) => (
-                      <div 
-                        key={`${file.name}-${index}`} 
-                        style={{ 
-                          padding: '0.5rem', 
-                          borderBottom: '1px solid #e9ecef',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
-                             style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
-                          <span>{file.name}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
-                          {file.size_str && <span>{file.size_str}</span>}
-                          {file.mtime && <span>{file.mtime}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ textAlign: 'center', color: '#666' }}>存储为空</p>
-                )}
+          <div className="card">
+            <h3>功能开发中</h3>
+            <p>远程服务端功能正在开发中，将在后续版本中推出。</p>
+            <div className="coming-soon">
+              <i className="fas fa-clock"></i>
+              <span>敬请期待</span>
+            </div>
+          </div>
+
+          {isAdmin && (
+            <div className="card admin-remote-section">
+              <h3>
+                <i className="fas fa-terminal"></i> 管理员命令执行
+              </h3>
+              {currentDir && (
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '6px', 
+                  marginBottom: '1rem',
+                  fontFamily: 'monospace',
+                  color: '#333'
+                }}>
+                  <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <input
+                  type="text"
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  placeholder="输入命令，如: dir, ipconfig"
+                  style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleExecuteCommand()}
+                />
+                <button className="btn" onClick={handleExecuteCommand} style={{ background: '#9b59b6' }}>
+                  <i className="fas fa-play"></i> 执行
+                </button>
               </div>
+              {cmdResult && (
+                <div style={{ 
+                  background: '#1a1a2e', 
+                  color: '#00ff00', 
+                  padding: '1rem', 
+                  borderRadius: '6px', 
+                  fontFamily: 'monospace',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}>
+                  <pre>{cmdResult}</pre>
+                </div>
+              )}
             </div>
           )}
         </div>
-        </div>
       )}
+    </div>
+  )
+
+  return (
+    <div className="container">
+      <header>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1>君卓博客</h1>
+            <p>Junzhuo Blog</p>
+          </div>
+          {isAdmin ? (
+            <button className="btn btn-logout" onClick={handleLogout} style={{ background: '#e74c3c' }}>
+              <i className="fas fa-sign-out-alt"></i> 退出管理员
+            </button>
+          ) : (
+            <button className="btn btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#9b59b6' }}>
+              <i className="fas fa-user-shield"></i> 登录管理员
+            </button>
+          )}
+        </div>
+        
+        <nav className="main-nav">
+          <button 
+            className={`nav-btn ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={() => setActiveTab('home')}
+          >
+            <i className="fas fa-home"></i> 首页
+          </button>
+          <button 
+            className={`nav-btn ${activeTab === 'fileServer' ? 'active' : ''}`}
+            onClick={() => setActiveTab('fileServer')}
+          >
+            <i className="fas fa-cloud-upload-alt"></i> 文件上传下载服务器
+          </button>
+          <button 
+            className={`nav-btn ${activeTab === 'remoteServer' ? 'active' : ''}`}
+            onClick={() => setActiveTab('remoteServer')}
+          >
+            <i className="fas fa-server"></i> 远程服务端
+          </button>
+        </nav>
+      </header>
+
+      <div className="tab-content">
+        {activeTab === 'home' && renderHomeTab()}
+        {activeTab === 'fileServer' && renderFileServerTab()}
+        {activeTab === 'remoteServer' && renderRemoteServerTab()}
+      </div>
 
       {showLoginModal && (
         <div style={{ 
@@ -833,6 +1002,79 @@ export default function Home() {
                 style={{ flex: 1 }}
               >
                 登录
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCmdModal && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000 
+        }}>
+          <div style={{ 
+            background: 'white', 
+            padding: '2rem', 
+            borderRadius: '12px', 
+            width: '90%', 
+            maxWidth: '600px' 
+          }}>
+            <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>
+              <i className="fas fa-terminal"></i> 命令执行
+            </h2>
+            {currentDir && (
+              <div style={{ 
+                background: '#f8f9fa', 
+                padding: '0.5rem 1rem', 
+                borderRadius: '6px', 
+                marginBottom: '1rem',
+                fontFamily: 'monospace',
+                color: '#333'
+              }}>
+                <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <input
+                type="text"
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                placeholder="输入命令，如: dir, ipconfig"
+                style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+              />
+              <button className="btn" onClick={handleExecuteCommand} style={{ background: '#9b59b6' }}>
+                <i className="fas fa-play"></i> 执行
+              </button>
+            </div>
+            {cmdResult && (
+              <div style={{ 
+                background: '#1a1a2e', 
+                color: '#00ff00', 
+                padding: '1rem', 
+                borderRadius: '6px', 
+                fontFamily: 'monospace',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}>
+                <pre>{cmdResult}</pre>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button 
+                className="btn" 
+                onClick={() => { setShowCmdModal(false); setCommand(''); setCmdResult('') }}
+                style={{ flex: 1, background: '#666' }}
+              >
+                关闭
               </button>
             </div>
           </div>
