@@ -68,7 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'register': {
       try {
         const { fields } = await parseForm(req)
-        const body = JSON.parse(fields.body as string)
+        const bodyValue = fields.body
+        const bodyString = Array.isArray(bodyValue) ? bodyValue[0] : bodyValue
+        const body = JSON.parse(bodyString as string)
         
         const { id: clientId, hostname, os, username, cpu, ram } = body
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
@@ -165,7 +167,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       try {
         const { files } = await parseForm(req)
-        const file = files.file as formidable.File
+        const fileValue = files.file
+        const file = (Array.isArray(fileValue) ? fileValue[0] : fileValue) as formidable.File
         
         if (!file) {
           res.status(400).json({ status: 'error', message: '缺少文件' })
