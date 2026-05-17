@@ -1,4 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
+import multer from 'multer'
+import { IncomingForm } from 'formidable'
+import { promises as fs } from 'fs'
 
 interface ClientInfo {
   id: string
@@ -38,137 +41,175 @@ const getGeolocation = async (ip: string): Promise<{ country: string; city: stri
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { action, id } = req.query
-  const clientId = id as string
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
 
-  switch (action) {
-    case 'register': {
-      const { id: clientId, hostname, os, username, cpu, ram } = req.body
-      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
-      const geo = await getGeolocation(ip.toString())
-      
-      const client: ClientInfo = {
-        id: clientId,
-        ip: ip.toString(),
-        ...geo,
-        hostname,
-        os,
-        username,
-        cpu,
-        ram,
-        lastHeartbeat: Date.now(),
-        status: 'online'
+const parseForm = async (req: NextApiRequest): Promise<{ fields: any; files: any }> => {
+  return new Promise((resolve, reject) => {
+    const form = new IncomingForm({
+      maxFileSize: 10 * 1024 * 1024,
+    })
+    
+    form.parse(req, (err, fields, files) => {
+      if (err) {
+        reject(err)
+        return
       }
-      
-      clients.set(clientId, client)
-      res.status(200).json({ status: 'success', message: '客户端注册成功' })
-      break
-    }
+      resolve({ fields, files })
+    })
+  })
+}
 
-    case 'heartbeat': {
-      if (!clientId) {
-        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
-        break
-      }
-      
-      const client = clients.get(clientId)
-      if (client) {
-        client.lastHeartbeat = Date.now()
-        client.status = 'online'
-        clients.set(clientId, client)
-        res.status(200).json({ status: 'success', message: '心跳更新成功' })
-      } else {
-        res.status(404).json({ status: 'error', message: '客户端不存在' })
-      }
-      break
-    }
+const handler = async (req: NextApiRequest, res: NextApiResponse) => {
+  const action = req.query.action as string
+  const clientId = req.query.id as string
 
-    case 'list': {
-      const now = Date.now()
-      const clientList = Array.from(clients.values()).map(client => {
-        const isOnline = now - client.lastHeartbeat < 30000
-        return {
-          ...client,
-          status: isOnline ? 'online' : 'offline' as 'online' | 'offline'
+  try {
+    switch (action) {
+      case 'register': {
+        const body = await new Promise((resolve) => {
+          let data = ''
+          req.on('data', (chunk) => { data += chunk })
+          req.on('end', () => { resolve(JSON.parse(data)) })
+        }) as { id: string; hostname: string; os: string; username: string; cpu: string; ram: string }
+
+        const ip = (req.headers['x-forwarded-for'] as string) || 
+                   (req.connection.remoteAddress as string) || 
+                   'unknown'
+        const geo = await getGeolocation(ip)
+        
+        const client: ClientInfo = {
+          id: body.id,
+          ip,
+          ...geo,
+          hostname: body.hostname,
+          os: body.os,
+          username: body.username,
+          cpu: body.cpu,
+          ram: body.ram,
+          lastHeartbeat: Date.now(),
+          status: 'online'
         }
-      })
-      res.status(200).json({ status: 'success', clients: clientList })
-      break
-    }
-
-    case 'info': {
-      if (!clientId) {
-        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+        
+        clients.set(body.id, client)
+        res.status(200).json({ status: 'success', message: '客户端注册成功' })
         break
       }
-      
-      const client = clients.get(clientId)
-      if (client) {
-        res.status(200).json({ status: 'success', client })
-      } else {
-        res.status(404).json({ status: 'error', message: '客户端不存在' })
-      }
-      break
-    }
 
-    case 'screenshot': {
-      if (!clientId) {
-        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+      case 'heartbeat': {
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        
+        const client = clients.get(clientId)
+        if (client) {
+          client.lastHeartbeat = Date.now()
+          client.status = 'online'
+          clients.set(clientId, client)
+          res.status(200).json({ status: 'success', message: '心跳更新成功' })
+        } else {
+          res.status(404).json({ status: 'error', message: '客户端不存在' })
+        }
         break
       }
-      
-      const url = screenshots.get(clientId)
-      if (url) {
-        res.status(200).json({ status: 'success', url })
-      } else {
-        res.status(404).json({ status: 'error', message: '截图不存在' })
-      }
-      break
-    }
 
-    case 'uploadScreenshot': {
-      if (!clientId) {
-        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+      case 'list': {
+        const now = Date.now()
+        const clientList = Array.from(clients.values()).map(client => {
+          const isOnline = now - client.lastHeartbeat < 30000
+          return {
+            ...client,
+            status: isOnline ? 'online' : 'offline' as 'online' | 'offline'
+          }
+        })
+        res.status(200).json({ status: 'success', clients: clientList })
         break
       }
-      
-      const files = (req as any).files
-      if (!files || !files.file) {
-        res.status(400).json({ status: 'error', message: '缺少截图文件' })
+
+      case 'info': {
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        
+        const client = clients.get(clientId)
+        if (client) {
+          res.status(200).json({ status: 'success', client })
+        } else {
+          res.status(404).json({ status: 'error', message: '客户端不存在' })
+        }
         break
       }
-      
-      const file = files.file
-      const screenshotData = file.data.toString('base64')
-      const dataUrl = `data:image/jpeg;base64,${screenshotData}`
-      
-      screenshots.set(clientId, dataUrl)
-      
-      const client = clients.get(clientId)
-      if (client) {
-        client.screenshotUrl = dataUrl
-        clients.set(clientId, client)
-      }
-      
-      res.status(200).json({ status: 'success', message: '截图上传成功' })
-      break
-    }
 
-    case 'remove': {
-      if (!clientId) {
-        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+      case 'screenshot': {
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        
+        const url = screenshots.get(clientId)
+        if (url) {
+          res.status(200).json({ status: 'success', url })
+        } else {
+          res.status(404).json({ status: 'error', message: '截图不存在' })
+        }
         break
       }
-      
-      clients.delete(clientId)
-      screenshots.delete(clientId)
-      res.status(200).json({ status: 'success', message: '客户端已移除' })
-      break
-    }
 
-    default: {
-      res.status(400).json({ status: 'error', message: '未知操作' })
+      case 'uploadScreenshot': {
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        
+        const { files } = await parseForm(req)
+        
+        if (!files || !files.file) {
+          res.status(400).json({ status: 'error', message: '缺少截图文件' })
+          break
+        }
+        
+        const file = files.file as { filepath: string; type: string }
+        const fileData = await fs.readFile(file.filepath)
+        const screenshotData = fileData.toString('base64')
+        const dataUrl = `data:image/jpeg;base64,${screenshotData}`
+        
+        screenshots.set(clientId, dataUrl)
+        
+        const client = clients.get(clientId)
+        if (client) {
+          client.screenshotUrl = dataUrl
+          clients.set(clientId, client)
+        }
+        
+        res.status(200).json({ status: 'success', message: '截图上传成功' })
+        break
+      }
+
+      case 'remove': {
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        
+        clients.delete(clientId)
+        screenshots.delete(clientId)
+        res.status(200).json({ status: 'success', message: '客户端已移除' })
+        break
+      }
+
+      default: {
+        res.status(400).json({ status: 'error', message: '未知操作' })
+      }
     }
+  } catch (error) {
+    console.error('API Error:', error)
+    res.status(500).json({ status: 'error', message: '服务器内部错误' })
   }
 }
+
+export default handler
