@@ -794,6 +794,9 @@ export default function Home() {
   const [selectedClient, setSelectedClient] = useState<any>(null)
   const [screenshotUrl, setScreenshotUrl] = useState('')
   const [screenViewActive, setScreenViewActive] = useState(false)
+  const [isFetchingScreenshot, setIsFetchingScreenshot] = useState(false)
+  const screenViewActiveRef = useRef(false)
+  const screenViewTimerRef = useRef<number | null>(null)
   const [directoryItems, setDirectoryItems] = useState<any[]>([])
   const [currentPath, setCurrentPath] = useState('')
   const [availableDrives, setAvailableDrives] = useState<string[]>([])
@@ -815,6 +818,9 @@ export default function Home() {
 
   const fetchScreenshot = async (clientId: string) => {
     try {
+      await sendRemoteCommand(clientId, '', 'screenshot')
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       const response = await fetch(`/api/admin/clients?action=screenshot&id=${clientId}`)
       const result = await response.json()
       if (result.status === 'success' && result.url) {
@@ -911,16 +917,26 @@ export default function Home() {
 
   const startScreenView = async (clientId: string) => {
     setScreenViewActive(true)
+    screenViewActiveRef.current = true
+    
     const fetchScreen = async () => {
-      if (!screenViewActive) return
+      if (!screenViewActiveRef.current) return
       await fetchScreenshot(clientId)
-      setTimeout(fetchScreen, 3000)
+      if (screenViewActiveRef.current) {
+        screenViewTimerRef.current = window.setTimeout(fetchScreen, 3000)
+      }
     }
-    fetchScreen()
+    
+    screenViewTimerRef.current = window.setTimeout(fetchScreen, 0)
   }
 
   const stopScreenView = () => {
     setScreenViewActive(false)
+    screenViewActiveRef.current = false
+    if (screenViewTimerRef.current) {
+      clearTimeout(screenViewTimerRef.current)
+      screenViewTimerRef.current = null
+    }
   }
 
   const handleMouseControl = (clientId: string, x: number, y: number, action: string) => {
