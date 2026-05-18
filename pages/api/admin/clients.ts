@@ -168,12 +168,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         
         const { files } = await parseForm(req)
         
-        if (!files || !files.file) {
+        if (!files || !files.screenshot) {
           res.status(400).json({ status: 'error', message: '缺少截图文件' })
           break
         }
         
-        const file = files.file as { filepath: string; type: string }
+        const file = files.screenshot as { filepath: string; type: string }
         const fileData = await fs.readFile(file.filepath)
         const screenshotData = fileData.toString('base64')
         const dataUrl = `data:image/jpeg;base64,${screenshotData}`
