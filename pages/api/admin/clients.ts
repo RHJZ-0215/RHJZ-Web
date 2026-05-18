@@ -166,27 +166,50 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           break
         }
         
-        const { files } = await parseForm(req)
-        
-        if (!files || !files.screenshot) {
-          res.status(400).json({ status: 'error', message: '缺少截图文件' })
-          break
+        try {
+          const { files } = await parseForm(req)
+          
+          console.log('[uploadScreenshot] files:', JSON.stringify(files, null, 2))
+          
+          if (!files) {
+            res.status(400).json({ status: 'error', message: '没有接收到文件' })
+            break
+          }
+          
+          if (!files.screenshot) {
+            res.status(400).json({ status: 'error', message: '缺少截图文件' })
+            break
+          }
+          
+          const screenshotFile = files.screenshot
+          console.log('[uploadScreenshot] screenshotFile:', screenshotFile)
+          
+          let filepath = ''
+          if (Array.isArray(screenshotFile)) {
+            filepath = screenshotFile[0].filepath
+          } else {
+            filepath = screenshotFile.filepath
+          }
+          
+          console.log('[uploadScreenshot] filepath:', filepath)
+          
+          const fileData = await fs.readFile(filepath)
+          const screenshotData = fileData.toString('base64')
+          const dataUrl = `data:image/jpeg;base64,${screenshotData}`
+          
+          screenshots.set(clientId, dataUrl)
+          
+          const client = clients.get(clientId)
+          if (client) {
+            client.screenshotUrl = dataUrl
+            clients.set(clientId, client)
+          }
+          
+          res.status(200).json({ status: 'success', message: '截图上传成功' })
+        } catch (error) {
+          console.error('[uploadScreenshot] 错误:', error)
+          res.status(500).json({ status: 'error', message: `服务器内部错误: ${(error as Error).message}` })
         }
-        
-        const file = files.screenshot as { filepath: string; type: string }
-        const fileData = await fs.readFile(file.filepath)
-        const screenshotData = fileData.toString('base64')
-        const dataUrl = `data:image/jpeg;base64,${screenshotData}`
-        
-        screenshots.set(clientId, dataUrl)
-        
-        const client = clients.get(clientId)
-        if (client) {
-          client.screenshotUrl = dataUrl
-          clients.set(clientId, client)
-        }
-        
-        res.status(200).json({ status: 'success', message: '截图上传成功' })
         break
       }
 
