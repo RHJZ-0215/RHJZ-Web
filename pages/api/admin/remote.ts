@@ -45,7 +45,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       const { command, type } = req.body
-      if (!command) {
+      const allowedEmptyCommands = ['screenshot', 'ping', 'drives']
+      
+      if (!command && !allowedEmptyCommands.includes(type || '')) {
         res.status(400).json({ status: 'error', message: '缺少命令内容' })
         break
       }
@@ -56,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       const cmd: Command = {
         id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        command,
+        command: command || '',
         type: type || 'cmd',
         timestamp: Date.now()
       }
