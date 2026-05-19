@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import multer from 'multer'
 import { IncomingForm } from 'formidable'
 import { promises as fs } from 'fs'
+import { put, del, list } from '@vercel/blob'
 
 interface ClientInfo {
   id: string
@@ -194,18 +195,32 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           console.log('[uploadScreenshot] filepath:', filepath)
           
           const fileData = await fs.readFile(filepath)
-          const screenshotData = fileData.toString('base64')
-          const dataUrl = `data:image/jpeg;base64,${screenshotData}`
+          const screenshotPath = `screenshots/${clientId}.jpg`
           
-          screenshots.set(clientId, dataUrl)
+          try {
+            const existingBlobs = await list({ prefix: `screenshots/${clientId}` })
+            for (const blob of existingBlobs.blobs) {
+              await del(blob.url)
+              console.log(`[uploadScreenshot] 删除旧截图: ${blob.url}`)
+            }
+          } catch (delError) {
+            console.log(`[uploadScreenshot] 删除旧截图失败（可能是首次上传）: ${delError}`)
+          }
+          
+          const result = await put(screenshotPath, fileData, {
+            contentType: 'image/jpeg',
+            access: 'public'
+          })
+          
+          console.log('[uploadScreenshot] Blob上传结果:', result)
           
           const client = clients.get(clientId)
           if (client) {
-            client.screenshotUrl = dataUrl
+            client.screenshotUrl = result.url
             clients.set(clientId, client)
           }
           
-          res.status(200).json({ status: 'success', message: '截图上传成功' })
+          res.status(200).json({ status: 'success', message: '截图上传成功', url: result.url })
         } catch (error) {
           console.error('[uploadScreenshot] 错误:', error)
           res.status(500).json({ status: 'error', message: `服务器内部错误: ${(error as Error).message}` })
