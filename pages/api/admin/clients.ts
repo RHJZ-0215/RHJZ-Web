@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import multer from 'multer'
 import { IncomingForm } from 'formidable'
 import { promises as fs } from 'fs'
-import { put, del, list } from '@vercel/blob'
+import { put, del, list, head } from '@vercel/blob'
 
 interface ClientInfo {
   id: string
@@ -152,9 +152,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           break
         }
         
-        const url = screenshots.get(clientId)
-        if (url) {
-          res.status(200).json({ status: 'success', url })
+        const client = clients.get(clientId)
+        if (client && client.screenshotUrl) {
+          res.status(200).json({ status: 'success', url: client.screenshotUrl })
         } else {
           res.status(404).json({ status: 'error', message: '截图不存在' })
         }
@@ -209,7 +209,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           
           const result = await put(screenshotPath, fileData, {
             contentType: 'image/jpeg',
-            access: 'public'
+            access: 'private'
           })
           
           console.log('[uploadScreenshot] Blob上传结果:', result)
