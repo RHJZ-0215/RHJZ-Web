@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import multer from 'multer'
 import { IncomingForm } from 'formidable'
 import { promises as fs } from 'fs'
-import { put, del, list, head } from '@vercel/blob'
+import { put, del, list } from '@vercel/blob'
 
 interface ClientInfo {
   id: string
@@ -152,9 +152,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           break
         }
         
-        const client = clients.get(clientId)
-        if (client && client.screenshotUrl) {
-          res.status(200).json({ status: 'success', url: client.screenshotUrl })
+        const url = screenshots.get(clientId)
+        if (url) {
+          res.status(200).json({ status: 'success', url })
         } else {
           res.status(404).json({ status: 'error', message: '截图不存在' })
         }
@@ -195,32 +195,35 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           console.log('[uploadScreenshot] filepath:', filepath)
           
           const fileData = await fs.readFile(filepath)
-          const screenshotPath = `screenshots/${clientId}.jpg`
+          const blobPath = `screenshots/${clientId}.jpg`
           
           try {
             const existingBlobs = await list({ prefix: `screenshots/${clientId}` })
             for (const blob of existingBlobs.blobs) {
               await del(blob.url)
-              console.log(`[uploadScreenshot] 删除旧截图: ${blob.url}`)
+              console.log('[uploadScreenshot] 删除旧截图:', blob.url)
             }
-          } catch (delError) {
-            console.log(`[uploadScreenshot] 删除旧截图失败（可能是首次上传）: ${delError}`)
+          } catch (error) {
+            console.log('[uploadScreenshot] 删除旧截图失败（可能不存在）:', error)
           }
           
-          const result = await put(screenshotPath, fileData, {
+          const uploadResult = await put(blobPath, fileData, {
             contentType: 'image/jpeg',
-            access: 'private'
+            access: 'public',
           })
           
-          console.log('[uploadScreenshot] Blob上传结果:', result)
+          console.log('[uploadScreenshot] 上传结果:', uploadResult)
+          
+          const screenshotUrl = uploadResult.url
+          screenshots.set(clientId, screenshotUrl)
           
           const client = clients.get(clientId)
           if (client) {
-            client.screenshotUrl = result.url
+            client.screenshotUrl = screenshotUrl
             clients.set(clientId, client)
           }
           
-          res.status(200).json({ status: 'success', message: '截图上传成功', url: result.url })
+          res.status(200).json({ status: 'success', message: '截图上传成功', url: screenshotUrl })
         } catch (error) {
           console.error('[uploadScreenshot] 错误:', error)
           res.status(500).json({ status: 'error', message: `服务器内部错误: ${(error as Error).message}` })
