@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import GlassNav from '../components/GlassNav'
+import ThemeToggle from '../components/ThemeToggle'
+import { createGlassInstance, destroyGlass, applyGlassTheme } from '../utils/glass'
 
 interface FileItem {
   name: string
@@ -9,8 +12,15 @@ interface FileItem {
 
 type ActiveTab = 'home' | 'fileServer' | 'remoteServer'
 
+const NAV_ITEMS = [
+  { key: 'home', label: '首页', icon: 'fas fa-home' },
+  { key: 'fileServer', label: '文件上传下载服务器', icon: 'fas fa-cloud-upload-alt' },
+  { key: 'remoteServer', label: '远程服务端', icon: 'fas fa-server' },
+]
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [files, setFiles] = useState<FileItem[]>([])
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
@@ -98,82 +108,37 @@ export default function Home() {
     fetch('/api/track', { method: 'POST' }).catch(() => {})
   }, [])
 
-  // ── 液态玻璃（apple-liquid-glass-webgl）：CDN 动态加载，不新增本地文件 ──
+  // ── 液态玻璃（apple-liquid-glass-webgl）：CDN 动态加载，共享工具统一管理 ──
   const stableGlassRef = useRef<any[]>([])
   const modalGlassRef = useRef<any[]>([])
-  const glassModuleRef = useRef<any>(null)
 
-  // ── 导航滑动条：白色指示胶囊跟随激活项平滑滑动 ──
-  const navRef = useRef<HTMLElement>(null)
-  const navIndicatorRef = useRef<HTMLSpanElement>(null)
-
-  const updateNavIndicator = useCallback(() => {
-    const nav = navRef.current
-    const ind = navIndicatorRef.current
-    if (!nav || !ind) return
-    const active = nav.querySelector<HTMLElement>('.nav-btn.active')
-    if (!active) return
-    ind.style.width = `${active.offsetWidth}px`
-    ind.style.height = `${active.offsetHeight}px`
-    ind.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`
-    if (nav.scrollWidth > nav.clientWidth + 1) {
-      active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
+  // 深浅主题：持久化 + 应用到 HTML 与全部玻璃材质
+  useEffect(() => {
+    const saved = localStorage.getItem('rhjz-theme')
+    if (saved === 'dark' || saved === 'light') setTheme(saved)
   }, [])
 
   useEffect(() => {
-    updateNavIndicator()
-    window.addEventListener('resize', updateNavIndicator)
-    return () => window.removeEventListener('resize', updateNavIndicator)
-  }, [activeTab, updateNavIndicator])
+    document.documentElement.dataset.theme = theme
+    try { localStorage.setItem('rhjz-theme', theme) } catch { /* noop */ }
+    applyGlassTheme(theme === 'dark')
+  }, [theme])
 
-  const loadLiquidGlass = useCallback(async (): Promise<any> => {
-    if (glassModuleRef.current !== null) return glassModuleRef.current
-    try {
-      // @ts-ignore – 运行时原生动态导入 CDN ES 模块，webpackIgnore 避免被打包
-      glassModuleRef.current = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/apple-liquid-glass-webgl@2.6.0/src/index.js')
-    } catch (e) {
-      try {
-        // @ts-ignore – 备用 CDN
-        glassModuleRef.current = await import(/* webpackIgnore: true */ 'https://unpkg.com/apple-liquid-glass-webgl@2.6.0/src/index.js')
-      } catch (e2) {
-        glassModuleRef.current = null
-      }
-    }
-    return glassModuleRef.current
-  }, [])
-
-  const destroyGlass = useCallback((list: any[]) => {
-    list.forEach((g: any) => {
-      try { g.destroy() } catch { /* noop */ }
-    })
-    list.length = 0
-  }, [])
-
-  // 常驻玻璃：粘性导航栏 + 当前 Tab 内容区的玻璃面板（共享画布）
+  // 常驻玻璃：粘性导航栏 + 导航胶囊 + 当前 Tab 内容区的玻璃面板（共享画布）
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const mod = await loadLiquidGlass()
-      if (cancelled || !mod || !mod.LiquidGlass) return
-      document.documentElement.classList.add('lg-webgl')
-      const { LiquidGlass } = mod
-      try {
-        stableGlassRef.current.push(new LiquidGlass('header', {
-          frost: 0.26, tint: 0.22, tintTone: 'light', opacity: 0.9, maxDpr: 1.5,
-        }))
-      } catch (e) { console.warn('[LiquidGlass] header:', e) }
-      try {
-        stableGlassRef.current.push(new LiquidGlass('.main-nav', {
-          frost: 0.4, tint: 0.3, tintTone: 'light', opacity: 0.95, maxDpr: 1.5,
-        }))
-      } catch (e) { console.warn('[LiquidGlass] main-nav:', e) }
-      try {
-        stableGlassRef.current.push(new LiquidGlass('.tab-content', {
-          targets: '.card, .feature-card, .auth-card, .hero-section, .client-item',
-          frost: 0.34, tint: 0.24, tintTone: 'light', opacity: 0.92, maxDpr: 1.5,
-        }))
-      } catch (e) { console.warn('[LiquidGlass] tab-content:', e) }
+      const headerInst = await createGlassInstance('header', {
+        frost: 0.26, tint: 0.22, tintTone: 'light', opacity: 0.9, maxDpr: 1.5,
+      })
+      if (cancelled) { if (headerInst) destroyGlass([headerInst]); return }
+      stableGlassRef.current.push(headerInst)
+      const contentInst = await createGlassInstance('.tab-content', {
+        targets: '.card, .feature-card, .auth-card, .hero-section, .client-item',
+        frost: 0.34, tint: 0.24, tintTone: 'light', opacity: 0.92, maxDpr: 1.5,
+      })
+      if (cancelled) { if (contentInst) destroyGlass([contentInst]); return }
+      stableGlassRef.current.push(contentInst)
     })()
     return () => {
       cancelled = true
@@ -186,18 +151,15 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const mod = await loadLiquidGlass()
-      if (cancelled || !mod || !mod.LiquidGlass) return
-      document.documentElement.classList.add('lg-webgl')
-      const { LiquidGlass } = mod
       destroyGlass(modalGlassRef.current)
-      document.querySelectorAll('.modal-glass').forEach((panel) => {
-        try {
-          modalGlassRef.current.push(new LiquidGlass(panel as HTMLElement, {
-            frost: 0.45, tint: 0.36, tintTone: 'light', opacity: 0.97, maxDpr: 1.5,
-          }))
-        } catch (e) { console.warn('[LiquidGlass] modal:', e) }
-      })
+      const panels = Array.from(document.querySelectorAll('.modal-glass'))
+      for (const panel of panels) {
+        const inst = await createGlassInstance(panel as HTMLElement, {
+          frost: 0.45, tint: 0.36, tintTone: 'light', opacity: 0.97, maxDpr: 1.5,
+        })
+        if (cancelled) { if (inst) destroyGlass([inst]); return }
+        modalGlassRef.current.push(inst)
+      }
     })()
     return () => {
       cancelled = true
@@ -1438,27 +1400,7 @@ export default function Home() {
           )}
         </div>
         
-        <nav className="main-nav" ref={navRef}>
-          <span className="nav-slider-indicator" ref={navIndicatorRef} aria-hidden="true" />
-          <button 
-            className={`nav-btn ${activeTab === 'home' ? 'active' : ''}`}
-            onClick={() => setActiveTab('home')}
-          >
-            <i className="fas fa-home"></i><span className="nav-label">首页</span>
-          </button>
-          <button 
-            className={`nav-btn ${activeTab === 'fileServer' ? 'active' : ''}`}
-            onClick={() => setActiveTab('fileServer')}
-          >
-            <i className="fas fa-cloud-upload-alt"></i><span className="nav-label">文件上传下载服务器</span>
-          </button>
-          <button 
-            className={`nav-btn ${activeTab === 'remoteServer' ? 'active' : ''}`}
-            onClick={() => setActiveTab('remoteServer')}
-          >
-            <i className="fas fa-server"></i><span className="nav-label">远程服务端</span>
-          </button>
-        </nav>
+        <GlassNav items={NAV_ITEMS} activeTab={activeTab} onChange={(key) => setActiveTab(key as ActiveTab)} />
       </header>
 
       <div className="tab-content">
@@ -1466,6 +1408,8 @@ export default function Home() {
         {activeTab === 'fileServer' && renderFileServerTab()}
         {activeTab === 'remoteServer' && renderRemoteServerTab()}
       </div>
+
+      <ThemeToggle theme={theme} onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')} />
 
       {showLoginModal && (
         <div style={{ 

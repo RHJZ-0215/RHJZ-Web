@@ -111,7 +111,7 @@ header p {
   font-weight: 500;
 }
 
-/* ── 顶部玻璃导航：液态玻璃胶囊 + 滑动指示条（App Store 风格） ── */
+/* ── 顶部玻璃导航：液态玻璃胶囊 + 果冻玻璃球（App Store 风格） ── */
 .main-nav {
   position: relative;
   display: flex;
@@ -139,21 +139,35 @@ header p {
   display: none;
 }
 
-.nav-slider-indicator {
+/* 高亮球：完全透明折射透镜（球下内容经 WebGL 折射轻微放大），保持胶囊形态 */
+.nav-ball {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 0;
+  z-index: 1;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow:
-    0 8px 22px rgba(31, 38, 135, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  pointer-events: none;
-  transition:
-    transform 0.38s cubic-bezier(0.22, 0.9, 0.3, 1),
-    width 0.38s cubic-bezier(0.22, 0.9, 0.3, 1),
-    height 0.38s cubic-bezier(0.22, 0.9, 0.3, 1);
+  background: transparent;
+  box-shadow: 0 6px 18px rgba(31, 38, 135, 0.1);
+  pointer-events: auto;
+  cursor: grab;
+  will-change: transform, width, height;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 贴合胶囊时浮于按钮之上：按下当前标签即可抓起玻璃珠拖拽 */
+.nav-ball.over {
+  z-index: 2;
+}
+
+/* 贴合后隐藏透镜层：激活标签文字直接可见，不被玻璃覆盖 */
+.nav-ball.settled canvas {
+  visibility: hidden;
+}
+
+.nav-ball.dragging {
+  cursor: grabbing;
 }
 
 .nav-btn {
@@ -205,6 +219,43 @@ header p {
     font-size: 0.85rem;
     gap: 0.4rem;
   }
+}
+
+/* ── 可复用液态玻璃胶囊（LiquidGlassCapsule 组件基础样式） ── */
+.liquid-glass-capsule {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 深色/浅色主题切换胶囊（右下角悬浮） ── */
+.theme-toggle {
+  position: fixed;
+  right: 26px;
+  bottom: 26px;
+  z-index: 300;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  font-size: 1.3rem;
+  color: #1d1d1f;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 16px 40px rgba(31, 38, 135, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+
+.theme-toggle i {
+  transition: transform 0.45s cubic-bezier(0.22, 0.9, 0.3, 1), opacity 0.3s ease;
 }
 
 .tab-content {
@@ -1245,7 +1296,9 @@ html.lg-webgl .feature-card,
 html.lg-webgl .hero-section,
 html.lg-webgl .auth-card,
 html.lg-webgl .client-item,
-html.lg-webgl .modal-glass {
+html.lg-webgl .modal-glass,
+html.lg-webgl .theme-toggle,
+html.lg-webgl .nav-ball {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -1319,4 +1372,165 @@ html.lg-webgl .modal-glass {
   .client-list-card {
     max-height: 300px;
   }
+}
+
+/* ── 深色主题（[data-theme='dark']，覆盖浅色默认值） ───────────── */
+:root {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+[data-theme='dark'] body {
+  background-color: #0b0d15;
+  color: #eef0f7;
+}
+
+[data-theme='dark'] .aurora-bg {
+  background:
+    radial-gradient(60% 46% at 12% 8%, rgba(66, 99, 255, 0.30), transparent 65%),
+    radial-gradient(50% 40% at 90% 6%, rgba(255, 71, 157, 0.20), transparent 65%),
+    radial-gradient(56% 46% at 86% 90%, rgba(0, 199, 255, 0.24), transparent 65%),
+    radial-gradient(46% 42% at 6% 92%, rgba(148, 87, 255, 0.26), transparent 65%),
+    linear-gradient(155deg, #10121f 0%, #0b0d15 45%, #140f1e 100%);
+}
+
+[data-theme='dark'] header,
+[data-theme='dark'] .main-nav,
+[data-theme='dark'] .hero-section,
+[data-theme='dark'] .feature-card,
+[data-theme='dark'] .card,
+[data-theme='dark'] .auth-card,
+[data-theme='dark'] .admin-card,
+[data-theme='dark'] .client-item,
+[data-theme='dark'] .client-panel,
+[data-theme='dark'] .client-info-card,
+[data-theme='dark'] .screen-view-card,
+[data-theme='dark'] .directory-card,
+[data-theme='dark'] .processes-card,
+[data-theme='dark'] .command-card,
+[data-theme='dark'] .actions-card,
+[data-theme='dark'] .glass-console,
+[data-theme='dark'] .modal-glass,
+[data-theme='dark'] .client-list-card,
+[data-theme='dark'] .empty-state {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] header h1,
+[data-theme='dark'] .hero-section h2 {
+  background: linear-gradient(120deg, #7d8cff, #b08bff 55%, #ff85c2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme='dark'] header p,
+[data-theme='dark'] .hero-section p,
+[data-theme='dark'] .feature-card p,
+[data-theme='dark'] .upload-text p,
+[data-theme='dark'] .auth-card p,
+[data-theme='dark'] .file-meta,
+[data-theme='dark'] .item-size,
+[data-theme='dark'] .process-pid,
+[data-theme='dark'] .process-user,
+[data-theme='dark'] .client-ip,
+[data-theme='dark'] .client-meta,
+[data-theme='dark'] .info-item .label,
+[data-theme='dark'] .browser-item .text-orange,
+[data-theme='dark'] .browser-item .text-blue {
+  color: rgba(238, 240, 247, 0.62);
+}
+
+[data-theme='dark'] .feature-card h3,
+[data-theme='dark'] .card h2,
+[data-theme='dark'] .card h3,
+[data-theme='dark'] .upload-text h3,
+[data-theme='dark'] .auth-card h2,
+[data-theme='dark'] .admin-section h3,
+[data-theme='dark'] .file-details h4,
+[data-theme='dark'] .client-hostname,
+[data-theme='dark'] .process-name,
+[data-theme='dark'] .item-name,
+[data-theme='dark'] .info-item,
+[data-theme='dark'] .empty-state h3,
+[data-theme='dark'] .modal-glass h2 {
+  color: #eef0f7;
+}
+
+[data-theme='dark'] .upload-area {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+[data-theme='dark'] .nav-btn {
+  color: rgba(238, 240, 247, 0.6);
+}
+
+[data-theme='dark'] .nav-btn:hover,
+[data-theme='dark'] .nav-btn.active {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] .btn {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .glass-input,
+[data-theme='dark'] .command-input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #eef0f7;
+}
+
+[data-theme='dark'] .glass-input::placeholder,
+[data-theme='dark'] .command-input::placeholder {
+  color: rgba(238, 240, 247, 0.45);
+}
+
+[data-theme='dark'] .command-output {
+  background: rgba(0, 0, 0, 0.32);
+  color: #d7e0f5;
+}
+
+[data-theme='dark'] .glass-row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .file-item {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .theme-toggle {
+  color: #eef0f7;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+[data-theme='dark'] ::selection {
+  background: rgba(122, 141, 255, 0.35);
+  color: #ffffff;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+  background-clip: padding-box;
 }
