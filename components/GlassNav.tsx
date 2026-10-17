@@ -322,8 +322,8 @@ export default function GlassNav({ items, activeTab, onChange }: GlassNavProps) 
     const navRect = nav.getBoundingClientRect();
     const now = performance.now();
     const dt = Math.max(now - s.prevPointerT, 4) / 1000;
-    // 限制在导航胶囊框内滑动：允许轻微溢出（≤16px），但不彻底出框
-    const target = clamp(e.clientX - navRect.left, s.w / 2 - 16, navRect.width - s.w / 2 + 16);
+    // 限制在导航胶囊框内滑动：允许轻微溢出（≤24px，参考 App Store 高亮），但不彻底出框
+    const target = clamp(e.clientX - navRect.left, s.w / 2 - 24, navRect.width - s.w / 2 + 24);
     s.dragVx = dt > 0 ? (target - s.x) / dt : 0;
     s.vx = s.dragVx;
     s.x = target;

@@ -86,24 +86,24 @@ export function applyGlassTheme(dark: boolean): void {
 // 常用玻璃面参数
 export const NAV_GLASS_OPTIONS = { frost: 0.4, tint: 0.3, tintTone: 'light', opacity: 0.95, maxDpr: 1.5 };
 export const CAPSULE_GLASS_OPTIONS = { frost: 0.45, tint: 0.34, tintTone: 'light', opacity: 0.96, maxDpr: 1.5 };
-// 导航高亮透镜：完全透明 + 折射放大（Liquid Glass V2 clear 材质）
+// 导航高亮透镜：完全透明 + 折射放大（Liquid Glass V2 clear 材质，边缘折射缩放较为明显）
 export const LENS_GLASS_OPTIONS = {
   lens: true, // 内部标记：不参与主题材质叠加
   frost: 0,
   backdropBlur: 0,
-  refraction: 60,
-  edgeReach: 0.24, // 边缘折射区域（边缘轻微缩放效果）
-  edgeWidth: 0.28,
-  dispersion: 0.6,
+  refraction: 80,
+  edgeReach: 0.5,  // 边缘折射区域（边缘明显缩放/扭曲感）
+  edgeWidth: 0.5,
+  dispersion: 0.8,
   body: 0,
   tint: 0,
   absorption: 0,
-  rim: 0.1,
-  reflection: 0.14,
-  highlight: 0.2,
+  rim: 0.22,        // 边缘亮边（高光折射感）
+  reflection: 0.16,
+  highlight: 0.28,
   echo: 0,
-  hairline: 0.5,
-  hairWidth: 0.42,
+  hairline: 0.7,    // 边缘细线轮廓
+  hairWidth: 0.5,
   roundness: 0.5,
   maxDpr: 1.5,
 };
