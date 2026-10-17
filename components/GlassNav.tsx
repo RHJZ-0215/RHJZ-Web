@@ -328,8 +328,8 @@ export default function GlassNav({ items, activeTab, onChange }: GlassNavProps) 
     s.vx = s.dragVx;
     s.x = target;
     s.prevPointerT = now;
-    // 透镜跟随球体（节流 ≤160ms 且位移 >3px：同步重绘开销大，避免拖拽卡顿）
-    if (now - s.lastLensT > 160 && Math.abs(target - s.lastLensX) > 3) {
+    // 透镜跟随球体（节流 ≤200ms 且位移 >4px：同步重绘开销大，避免拖拽卡顿）
+    if (now - s.lastLensT > 200 && Math.abs(target - s.lastLensX) > 4) {
       s.lastLensT = now;
       s.lastLensX = target;
       if (lensRef.current && lensRef.current.refresh) {
