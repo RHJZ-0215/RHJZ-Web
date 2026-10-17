@@ -92,18 +92,18 @@ export const LENS_GLASS_OPTIONS = {
   frost: 0,
   backdropBlur: 0,
   refraction: 80,
-  edgeReach: 0.5,  // 边缘折射区域（边缘明显缩放/扭曲感）
-  edgeWidth: 0.5,
+  edgeReach: 0.9,  // 边缘折射区域（边缘明显缩放/扭曲感）
+  edgeWidth: 0.9,
   dispersion: 0.8,
   body: 0,
   tint: 0,
   absorption: 0,
-  rim: 0.22,        // 边缘亮边（高光折射感）
+  rim: 0.9,        // 边缘亮边（高光折射感）
   reflection: 0.16,
   highlight: 0.28,
   echo: 0,
   hairline: 0.7,    // 边缘细线轮廓
   hairWidth: 0.5,
   roundness: 0.5,
-  maxDpr: 1.5,
+  maxDpr: 1,        // 渲染像素减半，显著降低拖拽/动画开销
 };

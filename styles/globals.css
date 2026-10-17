@@ -147,6 +147,7 @@ header p {
   z-index: 1;
   border-radius: 999px;
   background: transparent;
+  border: 1px solid transparent;
   box-shadow: 0 6px 18px rgba(31, 38, 135, 0.1);
   pointer-events: auto;
   cursor: grab;
@@ -154,6 +155,7 @@ header p {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 /* 贴合胶囊时浮于按钮之上：按下当前标签即可抓起玻璃珠拖拽 */
@@ -161,9 +163,15 @@ header p {
   z-index: 2;
 }
 
-/* 贴合后隐藏透镜层：激活标签文字直接可见，不被玻璃覆盖 */
+/* 贴合后：隐藏透镜层（静止零 WebGL 开销），改用淡玻璃胶囊外观明确标识当前标签 */
 .nav-ball.settled canvas {
   visibility: hidden;
+}
+
+.nav-ball.settled {
+  background: linear-gradient(135deg, rgba(120, 130, 255, 0.12), rgba(255, 255, 255, 0.32) 50%, rgba(120, 130, 255, 0.12));
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 10px rgba(31, 38, 135, 0.16), inset 0 0 0 0.5px rgba(255, 255, 255, 0.55);
 }
 
 .nav-ball.dragging {
@@ -189,6 +197,13 @@ header p {
   transition: color 0.22s ease, background-color 0.22s ease;
 }
 
+/* 图标与文字置于玻璃胶囊之上，贴合后不被覆盖 */
+.nav-btn i,
+.nav-btn .nav-label {
+  position: relative;
+  z-index: 3;
+}
+
 .nav-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -200,9 +215,15 @@ header p {
   background: rgba(255, 255, 255, 0.18);
 }
 
+/* 当前标签明显区分：文字加粗加深 + 图标紫色高亮 */
 .nav-btn.active {
   color: #1d1d1f;
+  font-weight: 700;
   background: transparent;
+}
+
+.nav-btn.active i {
+  color: #4f46e5;
 }
 
 .nav-btn.active:hover {
@@ -1476,6 +1497,21 @@ html.lg-webgl .nav-ball {
 [data-theme='dark'] .nav-btn:hover,
 [data-theme='dark'] .nav-btn.active {
   color: #ffffff;
+}
+
+/* 深色主题下当前标签胶囊更亮，明显区别于其他标签 */
+[data-theme='dark'] .nav-ball.settled {
+  background: linear-gradient(135deg, rgba(96, 106, 255, 0.22), rgba(255, 255, 255, 0.12) 50%, rgba(96, 106, 255, 0.22));
+  border-color: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 2px 12px rgba(96, 106, 255, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.3);
+}
+
+[data-theme='dark'] .nav-btn.active {
+  font-weight: 700;
+}
+
+[data-theme='dark'] .nav-btn.active i {
+  color: #9aa4ff;
 }
 
 [data-theme='dark'] .nav-btn:hover {
