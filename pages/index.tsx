@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 interface FileItem {
   name: string
@@ -96,6 +96,85 @@ export default function Home() {
     checkAdminStatus()
   }, [])
 
+  // ── 液态玻璃（apple-liquid-glass-webgl）：CDN 动态加载，不新增本地文件 ──
+  const stableGlassRef = useRef<any[]>([])
+  const modalGlassRef = useRef<any[]>([])
+  const glassModuleRef = useRef<any>(null)
+
+  const loadLiquidGlass = useCallback(async (): Promise<any> => {
+    if (glassModuleRef.current !== null) return glassModuleRef.current
+    try {
+      // @ts-ignore – 运行时原生动态导入 CDN ES 模块，webpackIgnore 避免被打包
+      glassModuleRef.current = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/apple-liquid-glass-webgl@2.6.0/src/index.js')
+    } catch (e) {
+      try {
+        // @ts-ignore – 备用 CDN
+        glassModuleRef.current = await import(/* webpackIgnore: true */ 'https://unpkg.com/apple-liquid-glass-webgl@2.6.0/src/index.js')
+      } catch (e2) {
+        glassModuleRef.current = null
+      }
+    }
+    return glassModuleRef.current
+  }, [])
+
+  const destroyGlass = useCallback((list: any[]) => {
+    list.forEach((g: any) => {
+      try { g.destroy() } catch { /* noop */ }
+    })
+    list.length = 0
+  }, [])
+
+  // 常驻玻璃：粘性导航栏 + 当前 Tab 内容区的玻璃面板（共享画布）
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const mod = await loadLiquidGlass()
+      if (cancelled || !mod || !mod.LiquidGlass) return
+      document.documentElement.classList.add('lg-webgl')
+      const { LiquidGlass } = mod
+      try {
+        stableGlassRef.current.push(new LiquidGlass('header', {
+          frost: 0.32, tint: 0.26, tintTone: 'light', opacity: 0.9,
+        }))
+      } catch (e) { console.warn('[LiquidGlass] header:', e) }
+      try {
+        stableGlassRef.current.push(new LiquidGlass('.tab-content', {
+          targets: '.card, .feature-card, .auth-card, .hero-section, .client-item',
+          frost: 0.42, tint: 0.28, tintTone: 'light', opacity: 0.92,
+        }))
+      } catch (e) { console.warn('[LiquidGlass] tab-content:', e) }
+    })()
+    return () => {
+      cancelled = true
+      destroyGlass(stableGlassRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 弹窗玻璃：跟随弹窗开合重建实例
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const mod = await loadLiquidGlass()
+      if (cancelled || !mod || !mod.LiquidGlass) return
+      document.documentElement.classList.add('lg-webgl')
+      const { LiquidGlass } = mod
+      destroyGlass(modalGlassRef.current)
+      document.querySelectorAll('.modal-glass').forEach((panel) => {
+        try {
+          modalGlassRef.current.push(new LiquidGlass(panel as HTMLElement, {
+            frost: 0.5, tint: 0.4, tintTone: 'light', opacity: 0.97,
+          }))
+        } catch (e) { console.warn('[LiquidGlass] modal:', e) }
+      })
+    })()
+    return () => {
+      cancelled = true
+      destroyGlass(modalGlassRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLoginModal, showCmdModal, showCreateModal, showFileEditor])
+
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage(text)
     setMessageType(type)
@@ -114,23 +193,23 @@ export default function Home() {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     if (uploadAreaRef.current) {
-      uploadAreaRef.current.style.borderColor = '#3498db'
-      uploadAreaRef.current.style.backgroundColor = '#f0f5ff'
+      uploadAreaRef.current.style.borderColor = '#4a6bff'
+      uploadAreaRef.current.style.backgroundColor = 'rgba(255,255,255,0.34)'
     }
   }
 
   const handleDragLeave = () => {
     if (uploadAreaRef.current) {
-      uploadAreaRef.current.style.borderColor = '#d1d9e6'
-      uploadAreaRef.current.style.backgroundColor = '#f8fafc'
+      uploadAreaRef.current.style.borderColor = 'rgba(59,91,255,0.35)'
+      uploadAreaRef.current.style.backgroundColor = 'rgba(255,255,255,0.2)'
     }
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     if (uploadAreaRef.current) {
-      uploadAreaRef.current.style.borderColor = '#d1d9e6'
-      uploadAreaRef.current.style.backgroundColor = '#f8fafc'
+      uploadAreaRef.current.style.borderColor = 'rgba(59,91,255,0.35)'
+      uploadAreaRef.current.style.backgroundColor = 'rgba(255,255,255,0.2)'
     }
     if (e.dataTransfer.files.length > 0 && fileInputRef.current) {
       fileInputRef.current.files = e.dataTransfer.files
@@ -464,7 +543,7 @@ export default function Home() {
               <h3>点击或拖放文件到此处</h3>
               <p>支持任意格式文件上传</p>
               {selectedFileName && (
-                <p style={{ color: '#3498db', fontWeight: '500', marginTop: '0.5rem' }}>
+                <p style={{ color: '#3b5bff', fontWeight: '500', marginTop: '0.5rem' }}>
                   已选择: {selectedFileName}
                 </p>
               )}
@@ -516,7 +595,7 @@ export default function Home() {
                       <button 
                         className="btn" 
                         onClick={() => handleDeleteFile(file.name)}
-                        style={{ background: '#e74c3c' }}
+                        style={{ background: '#ff4d5e' }}
                       >
                         <i className="fas fa-trash"></i> 删除
                       </button>
@@ -547,7 +626,7 @@ export default function Home() {
                   setShowLogs(!showLogs); 
                   if (!showLogs) fetchLogs(); 
                 }}
-                style={{ background: showLogs ? '#666' : '#3498db' }}
+                style={{ background: showLogs ? '#666' : '#3b5bff' }}
               >
                 <i className="fas fa-eye"></i> {showLogs ? '隐藏日志' : '查看日志'}
               </button>
@@ -562,7 +641,7 @@ export default function Home() {
                       className="btn"
                       onClick={() => { setLogTypeFilter(type); fetchLogs(); }}
                       style={{ 
-                        background: logTypeFilter === type ? '#3498db' : '#95a5a6',
+                        background: logTypeFilter === type ? '#3b5bff' : '#95a5a6',
                         padding: '0.3rem 0.8rem',
                         fontSize: '0.8rem'
                       }}
@@ -579,37 +658,24 @@ export default function Home() {
                   ))}
                 </div>
                 
-                <div style={{ 
-                  background: '#f8f9fa', 
-                  padding: '1rem', 
-                  borderRadius: '6px', 
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  fontFamily: 'monospace',
-                  fontSize: '0.9rem'
-                }}>
+                <div className="glass-console mono">
                   {logs.length > 0 ? (
                     <div>
                       {logs.map((log) => {
                         const date = new Date(log.timestamp)
                         const formattedDate = date.toLocaleString('zh-CN')
                         const typeColors: Record<string, string> = {
-                          access: '#3498db',
-                          upload: '#2ecc71',
-                          download: '#3498db',
+                          access: '#3b5bff',
+                          upload: '#00b894',
+                          download: '#3b5bff',
                           login: '#f39c12',
-                          logout: '#9b59b6',
+                          logout: '#7a4dff',
                           command: '#1abc9c',
-                          error: '#e74c3c',
+                          error: '#ff4d5e',
                           system: '#95a5a6'
                         }
                         return (
-                          <div key={log.id} style={{ 
-                            padding: '0.5rem', 
-                            borderBottom: '1px solid #e9ecef',
-                            display: 'flex',
-                            gap: '1rem'
-                          }}>
+                          <div key={log.id} className="glass-row">
                             <span style={{ color: '#666', whiteSpace: 'nowrap' }}>[{formattedDate}]</span>
                             <span style={{ color: typeColors[log.type] || '#333', whiteSpace: 'nowrap' }}>[{log.type === 'access' ? '访问' :
                                log.type === 'upload' ? '上传' :
@@ -621,7 +687,7 @@ export default function Home() {
                             <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{log.ip}</span>
                             <span style={{ fontWeight: '500' }}>{log.action}</span>
                             <span>{log.details}</span>
-                            {log.username && <span style={{ color: '#9b59b6' }}>(用户: {log.username})</span>}
+                            {log.username && <span style={{ color: '#7a4dff' }}>(用户: {log.username})</span>}
                           </div>
                         )
                       })}
@@ -645,7 +711,7 @@ export default function Home() {
                   setShowServerFiles(!showServerFiles); 
                   if (!showServerFiles) fetchServerFiles(); 
                 }}
-                style={{ background: showServerFiles ? '#666' : '#3498db' }}
+                style={{ background: showServerFiles ? '#666' : '#3b5bff' }}
               >
                 <i className="fas fa-folder-open"></i> {showServerFiles ? '隐藏' : '浏览文件'}
               </button>
@@ -668,7 +734,7 @@ export default function Home() {
                   <button 
                     className="btn" 
                     onClick={() => setShowCreateModal('file')}
-                    style={{ background: '#2ecc71', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                    style={{ background: '#00b894', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
                   >
                     <i className="fas fa-file-plus"></i> 新建文件
                   </button>
@@ -681,32 +747,19 @@ export default function Home() {
                   </button>
                 </div>
                 
-                <div style={{ 
-                  background: '#f8f9fa', 
-                  padding: '1rem', 
-                  borderRadius: '6px', 
-                  maxHeight: '400px',
-                  overflowY: 'auto'
-                }}>
+                <div className="glass-console">
                   {serverFiles.length > 0 ? (
                     <div>
                       {serverFiles.map((file) => (
                         <div 
                           key={file.path} 
-                          style={{ 
-                            padding: '0.5rem', 
-                            borderBottom: '1px solid #e9ecef',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            cursor: file.type === 'directory' ? 'pointer' : 'pointer'
-                          }}
+                          className="glass-row glass-row--space"
                           onClick={() => file.type === 'directory' && navigateToServerDir(file.path)}
                           onDoubleClick={() => file.type === 'file' && openFileEditor(file.path)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
-                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3b5bff' }}></i>
                             <span>{file.name}</span>
                             {file.type === 'file' && (
                               <span style={{ color: '#95a5a6', fontSize: '0.8rem' }}>(双击编辑)</span>
@@ -738,7 +791,7 @@ export default function Home() {
                   setShowBlobStorage(!showBlobStorage); 
                   if (!showBlobStorage) fetchBlobStorage(); 
                 }}
-                style={{ background: showBlobStorage ? '#666' : '#3498db' }}
+                style={{ background: showBlobStorage ? '#666' : '#3b5bff' }}
               >
                 <i className="fas fa-eye"></i> {showBlobStorage ? '隐藏' : '查看存储'}
               </button>
@@ -746,29 +799,17 @@ export default function Home() {
             
             {showBlobStorage && (
               <div style={{ marginTop: '1rem' }}>
-                <div style={{ 
-                  background: '#f8f9fa', 
-                  padding: '1rem', 
-                  borderRadius: '6px', 
-                  maxHeight: '400px',
-                  overflowY: 'auto'
-                }}>
+                <div className="glass-console">
                   {blobFiles.length > 0 ? (
                     <div>
                       {blobFiles.map((file, index) => (
                         <div 
                           key={`${file.name}-${index}`} 
-                          style={{ 
-                            padding: '0.5rem', 
-                            borderBottom: '1px solid #e9ecef',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
+                          className="glass-row glass-row--space"
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <i className={`fas ${file.type === 'directory' ? 'fa-folder' : 'fa-file'}`} 
-                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3498db' }}></i>
+                               style={{ color: file.type === 'directory' ? '#f39c12' : '#3b5bff' }}></i>
                             <span>{file.name}</span>
                           </div>
                           <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
@@ -1027,11 +1068,11 @@ export default function Home() {
                 value={remoteServerPassword}
                 onChange={(e) => setRemoteServerPassword(e.target.value)}
                 placeholder="请输入密码"
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                className="glass-input"
                 onKeyPress={(e) => e.key === 'Enter' && handleRemoteServerLogin()}
               />
               {remoteServerPasswordError && (
-                <p style={{ color: '#e74c3c', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                <p style={{ color: '#ff4d5e', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   {remoteServerPasswordError}
                 </p>
               )}
@@ -1055,14 +1096,14 @@ export default function Home() {
               <button 
                 className="btn" 
                 onClick={fetchClients}
-                style={{ background: '#3498db' }}
+                style={{ background: '#3b5bff' }}
               >
                 <i className="fas fa-refresh"></i> 刷新客户端
               </button>
               <button 
                 className="btn" 
                 onClick={handleRemoteServerLogout}
-                style={{ background: '#e74c3c' }}
+                style={{ background: '#ff4d5e' }}
               >
                 <i className="fas fa-lock"></i> 退出
               </button>
@@ -1155,7 +1196,7 @@ export default function Home() {
                           <button 
                             className="btn" 
                             onClick={() => startScreenView(selectedClient.id)}
-                            style={{ background: '#2ecc71' }}
+                            style={{ background: '#00b894' }}
                           >
                             <i className="fas fa-play"></i> 开始监控
                           </button>
@@ -1163,7 +1204,7 @@ export default function Home() {
                           <button 
                             className="btn" 
                             onClick={stopScreenView}
-                            style={{ background: '#e74c3c' }}
+                            style={{ background: '#ff4d5e' }}
                           >
                             <i className="fas fa-stop"></i> 停止监控
                           </button>
@@ -1225,7 +1266,7 @@ export default function Home() {
                         <button 
                           className="btn btn-sm" 
                           onClick={() => getClientDrives(selectedClient.id)}
-                          style={{ background: '#3498db' }}
+                          style={{ background: '#3b5bff' }}
                         >
                           <i className="fas fa-hard-drive"></i> 驱动器
                         </button>
@@ -1318,7 +1359,7 @@ export default function Home() {
                       <button 
                         className="btn" 
                         onClick={handleRemoteCmd}
-                        style={{ background: '#9b59b6' }}
+                        style={{ background: '#7a4dff' }}
                       >
                         <i className="fas fa-play"></i> 执行
                       </button>
@@ -1346,7 +1387,9 @@ export default function Home() {
   )
 
   return (
-    <div className="container">
+    <>
+      <div className="aurora-bg" aria-hidden="true" />
+      <div className="container">
       <header>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -1354,11 +1397,11 @@ export default function Home() {
             <p>Junzhuo Blog</p>
           </div>
           {isAdmin ? (
-            <button className="btn btn-logout" onClick={handleLogout} style={{ background: '#e74c3c' }}>
+            <button className="btn btn-logout" onClick={handleLogout} style={{ background: '#ff4d5e' }}>
               <i className="fas fa-sign-out-alt"></i> 退出管理员
             </button>
           ) : (
-            <button className="btn btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#9b59b6' }}>
+            <button className="btn btn-login" onClick={() => setShowLoginModal(true)} style={{ background: '#7a4dff' }}>
               <i className="fas fa-user-shield"></i> 登录管理员
             </button>
           )}
@@ -1399,19 +1442,13 @@ export default function Home() {
           left: 0, 
           right: 0, 
           bottom: 0, 
-          background: 'rgba(0,0,0,0.5)', 
+          background: 'rgba(24,28,58,0.42)', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
           zIndex: 1000 
         }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            width: '90%', 
-            maxWidth: '400px' 
-          }}>
+          <div className="modal-glass" style={{ width: '90%', maxWidth: '400px' }}>
             <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>
               <i className="fas fa-user-shield"></i> 管理员登录
             </h2>
@@ -1422,7 +1459,7 @@ export default function Home() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="用户名"
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                className="glass-input"
               />
             </div>
             <div style={{ marginBottom: '1.5rem' }}>
@@ -1432,7 +1469,7 @@ export default function Home() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="密码"
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                className="glass-input"
               />
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -1462,30 +1499,27 @@ export default function Home() {
           left: 0, 
           right: 0, 
           bottom: 0, 
-          background: 'rgba(0,0,0,0.5)', 
+          background: 'rgba(24,28,58,0.42)', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
           zIndex: 1000 
         }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            width: '90%', 
-            maxWidth: '600px' 
-          }}>
+          <div className="modal-glass" style={{ width: '90%', maxWidth: '600px' }}>
             <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>
               <i className="fas fa-terminal"></i> 命令执行
             </h2>
             {currentDir && (
               <div style={{ 
-                background: '#f8f9fa', 
-                padding: '0.5rem 1rem', 
-                borderRadius: '6px', 
+                background: 'rgba(255,255,255,0.3)', 
+                border: '1px solid rgba(255,255,255,0.45)',
+                padding: '0.6rem 1rem', 
+                borderRadius: '14px', 
                 marginBottom: '1rem',
                 fontFamily: 'monospace',
-                color: '#333'
+                color: '#333',
+                backdropFilter: 'blur(12px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(12px) saturate(150%)'
               }}>
                 <span style={{ color: '#666' }}>当前目录:</span> {currentDir}
               </div>
@@ -1496,9 +1530,9 @@ export default function Home() {
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
                 placeholder="输入命令，如: dir, ipconfig"
-                style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                className="glass-input glass-input--flex"
               />
-              <button className="btn" onClick={handleExecuteCommand} style={{ background: '#9b59b6' }}>
+              <button className="btn" onClick={handleExecuteCommand} style={{ background: '#7a4dff' }}>
                 <i className="fas fa-play"></i> 执行
               </button>
             </div>
@@ -1535,19 +1569,13 @@ export default function Home() {
           left: 0, 
           right: 0, 
           bottom: 0, 
-          background: 'rgba(0,0,0,0.5)', 
+          background: 'rgba(24,28,58,0.42)', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
           zIndex: 1000 
         }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            width: '90%', 
-            maxWidth: '400px' 
-          }}>
+          <div className="modal-glass" style={{ width: '90%', maxWidth: '400px' }}>
             <h2 style={{ marginBottom: '1.5rem', color: '#2c3e50' }}>
               <i className={`fas ${showCreateModal === 'file' ? 'fa-file-plus' : 'fa-folder-plus'}`}></i> 
               新建{showCreateModal === 'file' ? '文件' : '目录'}
@@ -1559,7 +1587,7 @@ export default function Home() {
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 placeholder={`请输入${showCreateModal === 'file' ? '文件' : '目录'}名称`}
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                className="glass-input"
                 autoFocus
               />
             </div>
@@ -1590,20 +1618,13 @@ export default function Home() {
           left: 0, 
           right: 0, 
           bottom: 0, 
-          background: 'rgba(0,0,0,0.5)', 
+          background: 'rgba(24,28,58,0.42)', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
           zIndex: 1000 
         }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            width: '90%', 
-            maxWidth: '800px',
-            maxHeight: '80vh'
-          }}>
+          <div className="modal-glass" style={{ width: '90%', maxWidth: '800px', maxHeight: '80vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#2c3e50' }}>
                 <i className="fas fa-file-edit"></i> 编辑文件
@@ -1613,16 +1634,7 @@ export default function Home() {
             <textarea
               value={editingContent}
               onChange={(e) => setEditingContent(e.target.value)}
-              style={{ 
-                width: '100%', 
-                height: '300px', 
-                padding: '1rem', 
-                borderRadius: '6px', 
-                border: '1px solid #ddd',
-                fontFamily: 'monospace',
-                fontSize: '0.9rem',
-                resize: 'vertical'
-              }}
+              className="glass-input glass-input--area" style={{ resize: 'vertical' }}
               placeholder="文件内容..."
             />
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -1645,5 +1657,6 @@ export default function Home() {
         </div>
       )}
     </div>
+    </>
   )
 }

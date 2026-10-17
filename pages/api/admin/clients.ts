@@ -152,7 +152,20 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           break
         }
         
-        const url = screenshots.get(clientId)
+        let url = screenshots.get(clientId)
+        
+        if (!url) {
+          try {
+            const existingBlobs = await list({ prefix: `screenshots/${clientId}` })
+            if (existingBlobs.blobs.length > 0) {
+              url = existingBlobs.blobs[0].url
+              screenshots.set(clientId, url)
+            }
+          } catch (error) {
+            console.log('[screenshot] 从Blob获取截图失败:', error)
+          }
+        }
+        
         if (url) {
           res.status(200).json({ status: 'success', url })
         } else {
