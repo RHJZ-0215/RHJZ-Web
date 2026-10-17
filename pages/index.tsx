@@ -94,12 +94,38 @@ export default function Home() {
   useEffect(() => {
     fetchFiles()
     checkAdminStatus()
+    // 访问日志：记录 IP / UA / 来源
+    fetch('/api/track', { method: 'POST' }).catch(() => {})
   }, [])
 
   // ── 液态玻璃（apple-liquid-glass-webgl）：CDN 动态加载，不新增本地文件 ──
   const stableGlassRef = useRef<any[]>([])
   const modalGlassRef = useRef<any[]>([])
   const glassModuleRef = useRef<any>(null)
+
+  // ── 导航滑动条：白色指示胶囊跟随激活项平滑滑动 ──
+  const navRef = useRef<HTMLElement>(null)
+  const navIndicatorRef = useRef<HTMLSpanElement>(null)
+
+  const updateNavIndicator = useCallback(() => {
+    const nav = navRef.current
+    const ind = navIndicatorRef.current
+    if (!nav || !ind) return
+    const active = nav.querySelector<HTMLElement>('.nav-btn.active')
+    if (!active) return
+    ind.style.width = `${active.offsetWidth}px`
+    ind.style.height = `${active.offsetHeight}px`
+    ind.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`
+    if (nav.scrollWidth > nav.clientWidth + 1) {
+      active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [])
+
+  useEffect(() => {
+    updateNavIndicator()
+    window.addEventListener('resize', updateNavIndicator)
+    return () => window.removeEventListener('resize', updateNavIndicator)
+  }, [activeTab, updateNavIndicator])
 
   const loadLiquidGlass = useCallback(async (): Promise<any> => {
     if (glassModuleRef.current !== null) return glassModuleRef.current
@@ -134,13 +160,18 @@ export default function Home() {
       const { LiquidGlass } = mod
       try {
         stableGlassRef.current.push(new LiquidGlass('header', {
-          frost: 0.32, tint: 0.26, tintTone: 'light', opacity: 0.9,
+          frost: 0.26, tint: 0.22, tintTone: 'light', opacity: 0.9, maxDpr: 1.5,
         }))
       } catch (e) { console.warn('[LiquidGlass] header:', e) }
       try {
+        stableGlassRef.current.push(new LiquidGlass('.main-nav', {
+          frost: 0.4, tint: 0.3, tintTone: 'light', opacity: 0.95, maxDpr: 1.5,
+        }))
+      } catch (e) { console.warn('[LiquidGlass] main-nav:', e) }
+      try {
         stableGlassRef.current.push(new LiquidGlass('.tab-content', {
           targets: '.card, .feature-card, .auth-card, .hero-section, .client-item',
-          frost: 0.42, tint: 0.28, tintTone: 'light', opacity: 0.92,
+          frost: 0.34, tint: 0.24, tintTone: 'light', opacity: 0.92, maxDpr: 1.5,
         }))
       } catch (e) { console.warn('[LiquidGlass] tab-content:', e) }
     })()
@@ -163,7 +194,7 @@ export default function Home() {
       document.querySelectorAll('.modal-glass').forEach((panel) => {
         try {
           modalGlassRef.current.push(new LiquidGlass(panel as HTMLElement, {
-            frost: 0.5, tint: 0.4, tintTone: 'light', opacity: 0.97,
+            frost: 0.45, tint: 0.36, tintTone: 'light', opacity: 0.97, maxDpr: 1.5,
           }))
         } catch (e) { console.warn('[LiquidGlass] modal:', e) }
       })
@@ -1407,24 +1438,25 @@ export default function Home() {
           )}
         </div>
         
-        <nav className="main-nav">
+        <nav className="main-nav" ref={navRef}>
+          <span className="nav-slider-indicator" ref={navIndicatorRef} aria-hidden="true" />
           <button 
             className={`nav-btn ${activeTab === 'home' ? 'active' : ''}`}
             onClick={() => setActiveTab('home')}
           >
-            <i className="fas fa-home"></i> 首页
+            <i className="fas fa-home"></i><span className="nav-label">首页</span>
           </button>
           <button 
             className={`nav-btn ${activeTab === 'fileServer' ? 'active' : ''}`}
             onClick={() => setActiveTab('fileServer')}
           >
-            <i className="fas fa-cloud-upload-alt"></i> 文件上传下载服务器
+            <i className="fas fa-cloud-upload-alt"></i><span className="nav-label">文件上传下载服务器</span>
           </button>
           <button 
             className={`nav-btn ${activeTab === 'remoteServer' ? 'active' : ''}`}
             onClick={() => setActiveTab('remoteServer')}
           >
-            <i className="fas fa-server"></i> 远程服务端
+            <i className="fas fa-server"></i><span className="nav-label">远程服务端</span>
           </button>
         </nav>
       </header>
