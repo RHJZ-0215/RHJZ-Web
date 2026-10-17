@@ -163,8 +163,12 @@ header p {
   z-index: 2;
 }
 
-/* 贴合后：保留完全透明折射透镜（球内文字图标被放大扭曲，当前标签明显区分）；
-   静止时不触发重绘（库按需渲染），零持续开销 */
+/* 贴合后隐藏透镜层：文字图标 100% 清晰不被玻璃重绘覆盖（扭曲效果在动画/拖拽中体现） */
+.nav-ball.settled canvas {
+  visibility: hidden;
+}
+
+/* 贴合时透镜层不遮挡、不重绘（静止零开销） */
 .nav-ball.settled {
   background: transparent;
   border-color: transparent;
@@ -194,7 +198,12 @@ header p {
   transition: color 0.22s ease, background-color 0.22s ease;
 }
 
-/* 文字与图标进入透镜折射层：贴合时被透明玻璃放大扭曲（App Store 风格），不被覆盖 */
+/* 文字与图标浮于透镜之上：贴合/拖拽时永远不被玻璃覆盖（扭曲效果作用于背景与边缘） */
+.nav-btn i,
+.nav-btn .nav-label {
+  position: relative;
+  z-index: 3;
+}
 
 .nav-label {
   overflow: hidden;
@@ -207,7 +216,7 @@ header p {
   background: rgba(255, 255, 255, 0.18);
 }
 
-/* 当前标签明显区分：文字加粗加深 + 图标紫色高亮 */
+/* 当前标签明显区分：文字加粗加深 + 图标放大并紫色高亮 */
 .nav-btn.active {
   color: #1d1d1f;
   font-weight: 700;
