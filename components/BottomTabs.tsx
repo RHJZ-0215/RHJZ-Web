@@ -35,6 +35,8 @@ export default function BottomTabs({ items, activeKey, dark, onChange }: BottomT
     if (!host || elRef.current) return
     const el = document.createElement('liquid-glass') as any
     el.style.cssText = 'width:100%;height:100%;display:block'
+    // 匹配屏幕实际分辨率（append 前设置，connectedCallback 才会读取），消除整体拉伸模糊
+    el.setAttribute('dpr', '2')
     // 按文档时序：先 append（默认 mode），再 setAttribute('mode') 触发 rebuild
     host.appendChild(el)
     el.setAttribute('mode', 'single-bottom-tabs')
@@ -108,7 +110,7 @@ export default function BottomTabs({ items, activeKey, dark, onChange }: BottomT
 
   return (
     <>
-      <Script src="/vendor/liquid-glass.js?v=55" strategy="afterInteractive" onLoad={mount} />
+      <Script src="/vendor/liquid-glass.js?v=57" strategy="afterInteractive" onLoad={mount} />
       <div className="bottom-tabs" role="navigation" aria-label="主导航">
         <div className="bottom-tabs__host" ref={hostRef} />
       </div>

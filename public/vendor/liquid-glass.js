@@ -7120,7 +7120,9 @@ ${sampleCode}}
     function buildTabBar(idPrefix, tabs, selectedTab, onSelect, y) {
       var _a2, _b2, _c;
       const tabsCount = tabs ? tabs.length : 3;
-      const tabW = glassW / tabsCount;
+      // 整数对齐：tabW 向下取整，标签整体居中，避免亚像素 LINEAR 插值导致的模糊
+      const tabW = Math.floor(glassW / tabsCount);
+      const barStartX = Math.round(glassX + (glassW - tabW * tabsCount) / 2);
       const glassY = y + GLASS_PAD;
       const containerEl = gooseGlass(
         `${idPrefix}-container`,
@@ -7153,7 +7155,7 @@ ${sampleCode}}
         const tabContentColor = isSel ? selColor : unselColor;
         const tabEl = gooseText(
           id,
-          { x: glassX + tabW * i, y: glassY, w: tabW, h: GLASS_H },
+          { x: barStartX + tabW * i, y: glassY, w: tabW, h: GLASS_H },
           label,
           {
             color: tabContentColor,
@@ -7161,7 +7163,7 @@ ${sampleCode}}
             fontWeight: isSel ? 700 : 400,
             align: "center",
             paddingPx: 0,
-            halo: palette.tabsTextHalo,
+            halo: "none",
             icon: { path: iconPath, size: 24, layoutSize: 28, color: isSel ? selColor : unselColor, viewport: (_c = cfg == null ? void 0 : cfg.viewport) != null ? _c : 960 }
           }
         );
@@ -7186,9 +7188,9 @@ ${sampleCode}}
       interactions[`${idPrefix}-container`] = dragInteractions;
       const indicatorEl = gooseGlass(
         `${idPrefix}-indicator`,
-        // Indicator glass x = TABS_PAD + 4dp. The renderer adds fraction*tabW
+        // Indicator glass x = barStartX（整数对齐）。The renderer adds fraction*tabW
         // via toggleXOffset (isBottomTabIndicator.dragWidth = tabW).
-        { x: TABS_PAD + GLASS_PAD, y: glassY, w: tabW, h: GLASS_H },
+        { x: barStartX, y: glassY, w: tabW, h: GLASS_H },
         {
           cornerRadius: glassR,
           refractionHeight: 10 * gooseDP2,
@@ -7238,7 +7240,7 @@ ${sampleCode}}
         // inset 4dp on all sides from the 容器. Faithful to LiquidBottomTabs.kt:
         //   hidden Row = height(56dp).fillMaxWidth().padding(horizontal=4dp)
         //   drawBackdrop paints 56dp × (TABS_W - 8dp) = 56dp × glassW.
-        containerRect: { x: glassX, y: glassY, w: glassW, h: GLASS_H },
+        containerRect: { x: barStartX, y: glassY, w: tabW * tabsCount, h: GLASS_H },
         // Container center + width — the indicator scales around the container
         // center (like tab-content), matching the original parent-child transform.
         containerCenterX: containerX + containerW / 2,
@@ -7249,7 +7251,7 @@ ${sampleCode}}
         // the opaque icon/label pixels blue inside the indicator.
         tabContentIds: Array.from({ length: tabsCount }, (_, i) => `${idPrefix}-tab-${i}`),
         tabContentRects: Array.from({ length: tabsCount }, (_, i) => ({
-          x: glassX + tabW * i,
+          x: barStartX + tabW * i,
           y: glassY,
           w: tabW,
           h: GLASS_H
