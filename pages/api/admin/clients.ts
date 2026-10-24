@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import multer from 'multer'
 import { IncomingForm } from 'formidable'
 import { promises as fs } from 'fs'
 import { put, del, list } from '@vercel/blob'
