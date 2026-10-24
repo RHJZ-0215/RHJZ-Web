@@ -20,7 +20,7 @@ export function setCors(res: NextApiResponse, methods = 'GET, POST, PUT, DELETE,
   res.setHeader('Access-Control-Allow-Methods', methods)
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Authorization, Content-Type, X-Api-Key, X-Filename, X-Overwrite, X-Folder',
+    'Content-Type, X-Filename, X-Local-Path, X-Overwrite, X-Folder',
   )
   res.setHeader('Access-Control-Max-Age', '86400')
 }
@@ -76,4 +76,11 @@ export function firstString(...values: unknown[]): string {
 export function parseFlag(...values: unknown[]): boolean {
   const raw = firstString(...values).toLowerCase()
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on'
+}
+
+/** 由请求推导站点根地址（用于自描述里的示例） */
+export function originOf(req: NextApiRequest): string {
+  const proto = String(req.headers['x-forwarded-proto'] || 'https')
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost')
+  return `${proto}://${host}`
 }

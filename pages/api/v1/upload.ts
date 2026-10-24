@@ -1,14 +1,13 @@
 // ─────────────────────────────────────────────────────────────
-// 文件服务器 · 程序化上传 API（v1）
+// 文件服务器 · 程序化上传 API（v1）· 无需 Key
 //
-// 一个接口吃三种请求体，方便任意语言/脚本调用：
-//   1) multipart/form-data  → 字段名 file（curl -F）
-//   2) 原始二进制           → curl --data-binary @本地文件
-//   3) JSON + base64/文本    → {"pathname":"a.txt","content":"...","encoding":"base64"}
+// 四种上传方式，任选其一：
+//   1) 指定服务器上的文件路径 → POST /api/v1/upload?localPath=D:\data\a.txt
+//   2) 原始二进制            → POST /api/v1/upload?path=notes/a.txt  (body 为文件内容)
+//   3) multipart/form-data   → POST /api/v1/upload  -F "file=@a.txt"
+//   4) JSON + base64/文本     → {"pathname":"a.txt","content":"...","encoding":"base64"}
 //
-// 认证：环境变量 UPLOAD_API_KEY（可逗号分隔多个），
-//       请求头 Authorization: Bearer <key> 或 X-Api-Key: <key>；
-//       未配置 Key 时开放上传，并允许管理员 Cookie 直接调用。
+// 全部无需鉴权，直接调用即可。
 // ─────────────────────────────────────────────────────────────
 
 import { put } from '@vercel/blob'
@@ -16,13 +15,14 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { IncomingForm } from 'formidable'
 import fs from 'fs/promises'
 import { addLog } from '../../../utils/logger'
-import { hasConfiguredKey, requireUploadAuth } from '../../../lib/uploadAuth'
+import { readLocalFile } from '../../../lib/localFile'
 import { blobDownloadUrl, guessContentType, normalizePathname } from '../../../lib/blobPath'
 import {
   fail,
   firstString,
   getClientIp,
   methodNotAllowed,
+  originOf,
   parseFlag,
   readRequestBody,
   setCors,
@@ -35,7 +35,7 @@ export const config = {
   },
 }
 
-/** 单文件上限：100MB（Vercel 函数请求体上限 4.5MB，超出请改用分片/直传） */
+/** 单文件上限：100MB（Vercel 函数请求体上限 4.5MB，超出请用 localPath 或分片） */
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 
 interface PreparedUpload {
@@ -43,9 +43,43 @@ interface PreparedUpload {
   body: Buffer | string
   contentType: string
   size: number
+  source: 'local-path' | 'raw' | 'multipart' | 'json'
 }
 
-/** multipart/form-data：取第一个文件字段（不限字段名） */
+/** 方式一：直接读取服务器本地文件（最快，不走网络传输） */
+async function parseLocalPath(
+  localPath: string,
+  targetPath: string,
+  folder: string,
+): Promise<PreparedUpload> {
+  const result = await readLocalFile(localPath, MAX_FILE_SIZE)
+  if (result.error || !result.buffer) {
+    const error: any = new Error(result.error || '读取本地文件失败')
+    error.httpCode = result.status || 400
+    throw error
+  }
+
+  const normalized = normalizePathname(
+    targetPath,
+    result.filename || `uploaded-${Date.now()}`,
+    folder,
+  )
+  if (normalized.error) {
+    const error: any = new Error(normalized.error)
+    error.httpCode = 400
+    throw error
+  }
+
+  return {
+    pathname: normalized.pathname!,
+    body: result.buffer,
+    contentType: guessContentType(normalized.pathname!),
+    size: result.buffer.length,
+    source: 'local-path',
+  }
+}
+
+/** 方式二：multipart/form-data，取第一个文件字段（不限字段名） */
 function parseMultipart(req: NextApiRequest): Promise<PreparedUpload> {
   const form = new IncomingForm({
     keepExtensions: true,
@@ -99,6 +133,7 @@ function parseMultipart(req: NextApiRequest): Promise<PreparedUpload> {
           body: buffer,
           contentType: firstFile.mimetype || guessContentType(normalized.pathname!),
           size: buffer.length,
+          source: 'multipart',
         })
       } catch (error) {
         reject(error)
@@ -116,16 +151,17 @@ function parseMultipart(req: NextApiRequest): Promise<PreparedUpload> {
   })
 }
 
-/** 原始二进制：文件名来自 X-Filename 头或 ?path= / ?filename= */
+/** 方式三：原始二进制，文件名来自 ?path= 或 X-Filename 头 */
 async function parseRawBody(
   req: NextApiRequest,
   queryPath: string,
+  folder: string,
 ): Promise<PreparedUpload> {
   const headerName = firstString(req.headers['x-filename'], req.headers['x-file-name'])
   const normalized = normalizePathname(
     queryPath || headerName,
     `uploaded-${Date.now()}.bin`,
-    firstString(req.query.folder),
+    folder,
   )
   if (normalized.error) throw new Error(normalized.error)
 
@@ -136,11 +172,17 @@ async function parseRawBody(
       ? declaredType
       : guessContentType(normalized.pathname!)
 
-  return { pathname: normalized.pathname!, body: buffer, contentType, size: buffer.length }
+  return {
+    pathname: normalized.pathname!,
+    body: buffer,
+    contentType,
+    size: buffer.length,
+    source: 'raw',
+  }
 }
 
-/** JSON：{"pathname":"docs/a.md","content":"...","encoding":"base64"|"utf8"} */
-async function parseJsonBody(req: NextApiRequest): Promise<PreparedUpload> {
+/** 方式四：JSON {"pathname":"a.md","content":"...","encoding":"base64"|"utf8"} */
+async function parseJsonBody(req: NextApiRequest, folder: string): Promise<PreparedUpload> {
   const raw = await readRequestBody(req, MAX_FILE_SIZE)
   let payload: any
   try {
@@ -157,7 +199,7 @@ async function parseJsonBody(req: NextApiRequest): Promise<PreparedUpload> {
   const normalized = normalizePathname(
     firstString(payload.pathname, payload.path, payload.filename),
     `uploaded-${Date.now()}.txt`,
-    firstString(payload.folder),
+    firstString(payload.folder) || folder,
   )
   if (normalized.error) throw new Error(normalized.error)
 
@@ -170,42 +212,42 @@ async function parseJsonBody(req: NextApiRequest): Promise<PreparedUpload> {
     body: buffer,
     contentType: firstString(payload.contentType) || guessContentType(normalized.pathname!),
     size: buffer.length,
+    source: 'json',
   }
 }
 
 /** 接口自描述：GET /api/v1/upload */
 function describe(req: NextApiRequest, res: NextApiResponse) {
-  const origin = (() => {
-    const proto = String(req.headers['x-forwarded-proto'] || 'https')
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost')
-    return `${proto}://${host}`
-  })()
+  const origin = originOf(req)
 
   return res.status(200).json({
     status: 'success',
     endpoint: `${origin}/api/v1/upload`,
+    downloadEndpoint: `${origin}/api/download/<文件名>`,
     methods: ['POST', 'PUT'],
-    authRequired: hasConfiguredKey(),
-    auth: hasConfiguredKey()
-      ? '请求头 Authorization: Bearer <UPLOAD_API_KEY> 或 X-Api-Key: <key>'
-      : '未配置 UPLOAD_API_KEY，接口开放；也可用管理员 Cookie 调用',
+    authRequired: false,
+    auth: '无需鉴权，直接调用',
     maxFileSizeMB: MAX_FILE_SIZE / 1024 / 1024,
-    bodyTypes: {
-      multipart: '字段名 file（或任意文件字段），可选 pathname / folder 字段',
-      raw: '原始二进制 + 请求头 X-Filename: 目标路径，或 ?path= 参数',
+    uploadModes: {
+      localPath: '?localPath=服务器上的文件绝对路径（读服务器本地文件，不经网络传输）',
+      raw: '请求体为文件原始字节，文件名用 ?path= 或 X-Filename 头',
+      multipart: '表单字段 file=@本地文件，可加 pathname / folder 文本字段',
       json: '{ "pathname": "a/b.txt", "content": "...", "encoding": "base64" | "utf8" }',
     },
     query: {
-      path: '目标路径（含目录），缺省用上传文件名',
+      localPath: '服务器本地文件路径（也可用 ?file= / ?source= 别名）',
+      path: '上传到服务器后的目标路径（含目录）',
       folder: '可选目录前缀',
       overwrite: '1/true 覆盖同名文件，默认 false',
       public: '1/true 上传为公开可访问，默认 private',
     },
     examples: {
-      curlRaw: `curl -X POST "${origin}/api/v1/upload?path=notes/a.txt" -H "X-Api-Key: $UPLOAD_API_KEY" --data-binary @a.txt`,
-      curlForm: `curl -X POST "${origin}/api/v1/upload" -H "X-Api-Key: $UPLOAD_API_KEY" -F "file=@a.txt" -F "folder=notes"`,
-      powershell: `Invoke-RestMethod -Method Post -Uri "${origin}/api/v1/upload?path=notes/a.txt" -Headers @{ "X-Api-Key" = $env:UPLOAD_API_KEY } -InFile a.txt -ContentType "application/octet-stream"`,
-      python: `requests.post("${origin}/api/v1/upload", params={"path": "notes/a.txt"}, headers={"X-Api-Key": key}, data=open("a.txt","rb"))`,
+      localPath: `curl -X POST "${origin}/api/v1/upload?localPath=D%3A%5Cdata%5Ca.txt&path=notes/a.txt"`,
+      curlRaw: `curl -X POST "${origin}/api/v1/upload?path=notes/a.txt" --data-binary @a.txt`,
+      curlForm: `curl -X POST "${origin}/api/v1/upload" -F "file=@a.txt" -F "folder=notes"`,
+      powershell: `Invoke-RestMethod -Method Post -Uri "${origin}/api/v1/upload?localPath=D:\\data\\a.txt&path=notes/a.txt"`,
+      python: `requests.post("${origin}/api/v1/upload", params={"path": "notes/a.txt"}, data=open("a.txt","rb"))`,
+      download: `curl -OJ "${origin}/api/download/notes/a.txt"`,
     },
   })
 }
@@ -224,27 +266,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return methodNotAllowed(res, ['GET', 'POST', 'PUT', 'OPTIONS'])
   }
 
-  const auth = requireUploadAuth(req)
-  if (!auth.ok) {
-    return fail(res, 401, auth.message || '未授权', { auth: auth.via })
-  }
-
+  const localPath = firstString(
+    req.query.localPath,
+    req.query.localpath,
+    req.query.file,
+    req.query.source,
+    req.headers['x-local-path'],
+  )
   const queryPath = firstString(req.query.path, req.query.pathname, req.query.filename)
+  const folder = firstString(req.query.folder)
   const overwrite = parseFlag(req.query.overwrite, req.headers['x-overwrite'])
   const isPublic = parseFlag(req.query.public, req.headers['x-public'])
   const contentTypeHeader = String(req.headers['content-type'] || '').toLowerCase()
 
   let prepared: PreparedUpload
   try {
-    if (contentTypeHeader.includes('multipart/form-data')) {
+    if (localPath) {
+      // 方式一：服务器本地路径优先（忽略请求体）
+      prepared = await parseLocalPath(localPath, queryPath, folder)
+    } else if (contentTypeHeader.includes('multipart/form-data')) {
       prepared = await parseMultipart(req)
     } else if (contentTypeHeader.includes('application/json')) {
-      prepared = await parseJsonBody(req)
+      prepared = await parseJsonBody(req, folder)
     } else {
-      prepared = await parseRawBody(req, queryPath)
+      prepared = await parseRawBody(req, queryPath, folder)
     }
   } catch (error: any) {
-    const status = error?.httpCode === 413 ? 413 : 400
+    const status = error?.httpCode === 413 ? 413 : error?.httpCode || 400
     const message =
       error?.httpCode === 413
         ? `文件过大，单文件上限 ${MAX_FILE_SIZE / 1024 / 1024}MB`
@@ -253,8 +301,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // 显式指定 path 时优先使用（覆盖 multipart 里的 pathname 字段）
-  if (queryPath && !contentTypeHeader.includes('multipart/form-data')) {
-    const normalized = normalizePathname(queryPath, prepared.pathname, firstString(req.query.folder))
+  if (queryPath && !contentTypeHeader.includes('multipart/form-data') && !localPath) {
+    const normalized = normalizePathname(queryPath, prepared.pathname, folder)
     if (normalized.error) return fail(res, 400, normalized.error)
     prepared.pathname = normalized.pathname!
   }
@@ -271,7 +319,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ip: getClientIp(req),
       type: 'upload',
       action: 'API 文件上传',
-      details: `文件: ${result.pathname}, 大小: ${prepared.size} bytes, 来源: ${auth.via}`,
+      details: `文件: ${result.pathname}, 大小: ${prepared.size} bytes, 方式: ${prepared.source}`,
     })
 
     return res.status(200).json({
@@ -284,7 +332,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       size: prepared.size,
       contentType: result.contentType || prepared.contentType,
       access: isPublic ? 'public' : 'private',
-      auth: auth.via,
+      source: prepared.source,
     })
   } catch (error: any) {
     const message = String(error?.message || '')

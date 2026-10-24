@@ -7,6 +7,7 @@ interface ApiUploadPanelProps {
 
 interface ApiInfo {
   endpoint?: string
+  downloadEndpoint?: string
   authRequired?: boolean
   auth?: string
   maxFileSizeMB?: number
@@ -14,27 +15,33 @@ interface ApiInfo {
 }
 
 const FALLBACK_EXAMPLES: Record<string, string> = {
+  localPath:
+    'curl -X POST "https://<你的域名>/api/v1/upload?localPath=D:\\data\\a.txt&path=notes/a.txt"',
   curlRaw:
-    'curl -X POST "https://<你的域名>/api/v1/upload?path=notes/a.txt" \\\n  -H "X-Api-Key: $UPLOAD_API_KEY" \\\n  --data-binary @a.txt',
+    'curl -X POST "https://<你的域名>/api/v1/upload?path=notes/a.txt" \\\n  --data-binary @a.txt',
   curlForm:
-    'curl -X POST "https://<你的域名>/api/v1/upload" \\\n  -H "X-Api-Key: $UPLOAD_API_KEY" \\\n  -F "file=@a.txt" -F "folder=notes"',
+    'curl -X POST "https://<你的域名>/api/v1/upload" \\\n  -F "file=@a.txt" -F "folder=notes"',
   powershell:
-    'Invoke-RestMethod -Method Post `\n  -Uri "https://<你的域名>/api/v1/upload?path=notes/a.txt" `\n  -Headers @{ "X-Api-Key" = $env:UPLOAD_API_KEY } `\n  -InFile a.txt -ContentType "application/octet-stream"',
+    'Invoke-RestMethod -Method Post `\n  -Uri "https://<你的域名>/api/v1/upload?localPath=D:\\data\\a.txt&path=notes/a.txt"',
   python:
-    'requests.post("https://<你的域名>/api/v1/upload",\n              params={"path": "notes/a.txt"},\n              headers={"X-Api-Key": key},\n              data=open("a.txt", "rb"))',
+    'requests.post("https://<你的域名>/api/v1/upload",\n              params={"path": "notes/a.txt"},\n              data=open("a.txt", "rb"))',
+  download:
+    'curl -OJ "https://<你的域名>/api/download/notes/a.txt"\n# 或\ncurl -OJ "https://<你的域名>/api/download?name=notes/a.txt"',
 }
 
 const EXAMPLE_LABELS: Record<string, string> = {
+  localPath: '服务器文件路径',
   curlRaw: 'curl · 原始二进制',
   curlForm: 'curl · 表单上传',
   powershell: 'PowerShell · 本地上传',
   python: 'Python · requests',
+  download: '下载已上传文件',
 }
 
-/** 程序化上传 API 说明面板（管理员） */
+/** 程序化上传 / 下载 API 说明面板（管理员） */
 export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) {
   const [info, setInfo] = useState<ApiInfo | null>(null)
-  const [active, setActive] = useState('curlRaw')
+  const [active, setActive] = useState('localPath')
 
   useEffect(() => {
     if (!show) return
@@ -53,7 +60,11 @@ export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) 
   }, [show])
 
   const examples = { ...FALLBACK_EXAMPLES, ...(info?.examples || {}) }
-  const endpoint = info?.endpoint || `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/upload`
+  const origin =
+    info?.endpoint?.replace(/\/api\/v1\/upload$/, '') ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  const uploadEndpoint = info?.endpoint || `${origin}/api/v1/upload`
+  const downloadEndpoint = info?.downloadEndpoint || `${origin}/api/download/<文件名>`
   const code = examples[active] || FALLBACK_EXAMPLES[active]
 
   return (
@@ -66,7 +77,7 @@ export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) 
         }}
       >
         <h2>
-          <i className="fas fa-code"></i> 程序上传 API
+          <i className="fas fa-code"></i> 程序上传 / 下载 API
         </h2>
         <button
           className="btn"
@@ -81,16 +92,16 @@ export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) 
         <div style={{ marginTop: '1rem' }}>
           <div className="api-meta">
             <div>
-              <span className="api-meta__key">接口</span>
-              <code className="api-inline">POST {endpoint}</code>
+              <span className="api-meta__key">上传</span>
+              <code className="api-inline">POST {uploadEndpoint}</code>
+            </div>
+            <div>
+              <span className="api-meta__key">下载</span>
+              <code className="api-inline">GET {downloadEndpoint}</code>
             </div>
             <div>
               <span className="api-meta__key">鉴权</span>
-              <span>
-                {info?.authRequired
-                  ? '请求头 X-Api-Key 或 Authorization: Bearer <key>'
-                  : '未配置 UPLOAD_API_KEY，接口开放（建议配置后使用）'}
-              </span>
+              <span>无需 Key，直接调用</span>
             </div>
             <div>
               <span className="api-meta__key">单文件上限</span>
@@ -100,6 +111,12 @@ export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) 
               <span className="api-meta__key">同名文件</span>
               <span>
                 默认不覆盖，加 <code className="api-inline">?overwrite=1</code> 覆盖
+              </span>
+            </div>
+            <div>
+              <span className="api-meta__key">本地路径上传</span>
+              <span>
+                加 <code className="api-inline">?localPath=</code> 直接读服务器上的文件
               </span>
             </div>
           </div>
@@ -121,9 +138,10 @@ export default function ApiUploadPanel({ show, onToggle }: ApiUploadPanelProps) 
           </pre>
 
           <p className="api-hint">
-            支持三种请求体：原始二进制、multipart 表单、JSON（base64 或文本）。
-            上传完成后返回 <code className="api-inline">pathname</code> 与{' '}
-            <code className="api-inline">downloadUrl</code>。
+            四种上传方式：<code className="api-inline">localPath</code> 读服务器本地文件、
+            原始二进制、multipart 表单、JSON（base64 或文本）。
+            上传返回 <code className="api-inline">pathname</code> 与{' '}
+            <code className="api-inline">downloadUrl</code>，下载时直接带上该路径即可。
           </p>
         </div>
       )}
