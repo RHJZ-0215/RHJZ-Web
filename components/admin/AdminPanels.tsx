@@ -1,6 +1,7 @@
 import LogsPanel from './LogsPanel'
 import ServerFilesPanel from './ServerFilesPanel'
 import BlobPanel from './BlobPanel'
+import ApiUploadPanel from './ApiUploadPanel'
 
 export interface AdminToolsShape {
   logs: import('../../types').LogRecord[]
@@ -26,6 +27,9 @@ export interface AdminToolsShape {
   blobFiles: import('../../types').FileItem[]
   setShowBlobStorage: (v: boolean) => void
   fetchBlobStorage: () => void | Promise<void>
+
+  showApiDocs: boolean
+  setShowApiDocs: (v: boolean) => void
 }
 
 /** 管理员面板组：日志 + 服务器文件 + Blob 存储 */
@@ -71,6 +75,11 @@ export default function AdminPanels({ t }: { t: AdminToolsShape }) {
           t.setShowBlobStorage(next)
           if (next) t.fetchBlobStorage()
         }}
+      />
+
+      <ApiUploadPanel
+        show={t.showApiDocs}
+        onToggle={() => t.setShowApiDocs(!t.showApiDocs)}
       />
     </div>
   )

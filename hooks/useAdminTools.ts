@@ -43,6 +43,9 @@ export function useAdminTools(showMessage: ShowMessage) {
   const [showBlobStorage, setShowBlobStorage] = useState(false)
   const [blobFiles, setBlobFiles] = useState<FileItem[]>([])
 
+  // 程序上传 API 说明
+  const [showApiDocs, setShowApiDocs] = useState(false)
+
   // 命令弹窗
   const [showCmdModal, setShowCmdModal] = useState(false)
   const [command, setCommand] = useState('')
@@ -174,6 +177,8 @@ export function useAdminTools(showMessage: ShowMessage) {
     // Blob
     showBlobStorage, blobFiles,
     setShowBlobStorage, fetchBlobStorage,
+    // 程序上传 API
+    showApiDocs, setShowApiDocs,
     // 命令弹窗
     showCmdModal, command, cmdResult, currentDir,
     setShowCmdModal, setCommand, setCmdResult, handleExecuteCommand,
