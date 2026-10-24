@@ -108,7 +108,7 @@ export default function BottomTabs({ items, activeKey, dark, onChange }: BottomT
 
   return (
     <>
-      <Script src="/vendor/liquid-glass.js?v=54" strategy="afterInteractive" onLoad={mount} />
+      <Script src="/vendor/liquid-glass.js?v=55" strategy="afterInteractive" onLoad={mount} />
       <div className="bottom-tabs" role="navigation" aria-label="主导航">
         <div className="bottom-tabs__host" ref={hostRef} />
       </div>

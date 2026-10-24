@@ -4657,6 +4657,18 @@ ${sampleCode}}
         origCornerRadius: el.cornerRadius,
         elementRotation: (_d = el.elementRotation) != null ? _d : 0
       };
+      // 透明背景改造：indicator 透镜形状内先清除底层内容（destination-out），
+      // 避免底层 tab 内容（正常位置）与放大内容叠加产生重影；随后 pass 绘制放大内容
+      if (el.isBottomTabIndicator) {
+        gl.useProgram(this.plainRectProgram);
+        this.gooseSDFUniforms(this.uPr, this.aPosLocPr, { x: sx, y: sy, w: sw, h: sh }, radii[0]);
+        gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform4f(this.uPr["uColor"], 0, 0, 0, 1);
+        gl.uniform1f(this.uPr["uCornerStyle"], this.cornerStyle);
+        gl.uniform1f(this.uPr["uUseContinuousSdf"], 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      }
       this.gooseGlassShadow(state);
       if (el.useSeparableBlur && el.blurRadius >= 0.5) {
         const blurRadiusPx = el.blurRadius * state.layerScale * this.dpr;
