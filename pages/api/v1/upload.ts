@@ -269,11 +269,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const localPath = firstString(
     req.query.localPath,
     req.query.localpath,
+    req.query.UPLOADFILE,
+    req.query.uploadfile,
     req.query.file,
     req.query.source,
     req.headers['x-local-path'],
+    req.headers['x-upload-file'],
   )
-  const queryPath = firstString(req.query.path, req.query.pathname, req.query.filename)
+  const queryPath = firstString(
+    req.query.path,
+    req.query.pathname,
+    req.query.filename,
+    req.query.UPLOADPATH,
+    req.query.uploadpath,
+  )
   const folder = firstString(req.query.folder)
   const overwrite = parseFlag(req.query.overwrite, req.headers['x-overwrite'])
   const isPublic = parseFlag(req.query.public, req.headers['x-public'])

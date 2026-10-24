@@ -29,11 +29,15 @@ OPTIONS /api/v1/upload   # CORS 预检
 `Content-Type` 自动识别：含 `multipart/form-data` 走表单，含 `application/json` 走 JSON，
 其余一律按原始字节读取；只要带了 `localPath` 参数，就优先读服务器本地文件（忽略请求体）。
 
+> **从自己的电脑上传，用命令 `node scripts/upload.mjs UPLOADFILE="<本机路径>"`**（见文末「命令行工具」）。
+> `?localPath=` / `?UPLOADFILE=` 这类 **query 参数**指的是**运行服务的那台机器**上的路径，
+> 部署到 Vercel 后服务端读不到你电脑上的 `D:\...`，会返回 404。
+
 ### Query 参数
 
 | 参数 | 说明 | 默认 |
 | --- | --- | --- |
-| `localPath` | **服务器上**的文件路径，如 `D:\data\a.txt`、`/tmp/a.txt`、`~/a.txt` | 无 |
+| `localPath` | **服务器上**的文件路径，如 `D:\data\a.txt`、`/tmp/a.txt`、`~/a.txt`；别名 `UPLOADFILE` / `file` / `source` | 无 |
 | `path` | 上传到服务器后的目标路径（可含目录），如 `notes/2026/a.txt` | 本地文件名 |
 | `pathname` / `filename` | 同 `path` 的别名 | — |
 | `folder` | 目录前缀，与文件名拼接 | 无 |
@@ -169,14 +173,42 @@ curl -X POST "https://<域名>/api/v1/upload" \
   -d '{"pathname":"docs/hello.md","content":"# Hello","encoding":"utf8"}'
 ```
 
-### 命令行工具（仓库自带）
+### 命令行工具（仓库自带，最省事）
 
-```bash
-node scripts/upload.mjs ./report.pdf docs/2026/report.pdf --overwrite
-node scripts/upload.mjs --download docs/2026/report.pdf --out ./downloads
+只需把本机文件路径交给 `UPLOADFILE`：
+
+```powershell
+# Windows PowerShell（先指向线上地址，之后同窗口内一直有效）
+$env:UPLOAD_API_URL = "https://<域名>/api/v1/upload"
+node scripts/upload.mjs UPLOADFILE="D:\desktop\notes\a.txt"
 ```
 
-`--url` 或环境变量 `UPLOAD_API_URL` 可指向线上地址，默认 `http://localhost:3000/api/v1/upload`。
+```bash
+# Linux / macOS
+export UPLOAD_API_URL="https://<域名>/api/v1/upload"
+node scripts/upload.mjs UPLOADFILE="/home/me/notes/a.txt"
+```
+
+上传成功后文件立刻出现在网页「文件服务器 → 文件下载」列表里。
+
+可选参数（KEY=VALUE 或环境变量均可）：
+
+| 参数 | 说明 |
+| --- | --- |
+| `UPLOADFILE=<路径>` | 要上传的本机文件（必填） |
+| `UPLOADPATH=<目标路径>` | 上传后保存的路径，默认取文件名 |
+| `OVERWRITE=1` | 覆盖同名文件 |
+| `PUBLIC=1` | 上传为公开可访问 |
+| `UPLOAD_API_URL=<地址>` | 上传接口地址 |
+
+```bash
+node scripts/upload.mjs UPLOADFILE="D:\desktop\notes\a.txt" UPLOADPATH=notes/a.txt OVERWRITE=1
+node scripts/upload.mjs UPLOADFILE="D:\desktop\notes\a.txt" PUBLIC=1
+node scripts/upload.mjs --download notes/a.txt --out ./downloads
+```
+
+也兼容旧的直接给路径写法：`node scripts/upload.mjs ./report.pdf docs/2026/report.pdf --overwrite`。
+
 
 ---
 
