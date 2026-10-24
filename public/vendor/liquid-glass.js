@@ -4224,6 +4224,35 @@ ${sampleCode}}
           this.gl.enable(this.gl.BLEND);
           this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
         }
+        // 静止选中灰底：在 container 之后、tab 内容之前绘制（文字在其上方，不被覆盖）。
+        // 按下/拖拽时 indicator 透镜在最上层渲染，此处不绘制灰底。
+        if (el.isBottomTabContainer) {
+          const gId = el.isBottomTabContainer.groupId;
+          const indEl = this.buttonConfigs.find((e) => e.isBottomTabIndicator && e.isBottomTabIndicator.groupId === gId);
+          if (indEl) {
+            const indTg = this.toggleStates.get(gId);
+            const indPp = indTg ? indTg.pressProgress : 0;
+            if (indPp < 0.001) {
+              const frac = indTg ? indTg.fraction : 0;
+              const restX = indEl.rect.x + frac * indEl.isBottomTabIndicator.dragWidth;
+              const rc = indEl.isBottomTabIndicator.restColor;
+              this.gooseBindFBO(curFbo);
+              gl.enable(gl.BLEND);
+              gl.useProgram(this.plainRectProgram);
+              this.gooseSDFUniforms(this.uPr, this.aPosLocPr, { x: restX, y: indEl.rect.y, w: indEl.rect.w, h: indEl.rect.h }, indEl.cornerRadius);
+              gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+              gl.uniform4f(this.uPr["uColor"], rc[0], rc[1], rc[2], rc[3]);
+              gl.uniform1f(this.uPr["uCornerStyle"], this.cornerStyle);
+              gl.uniform1f(this.uPr["uUseContinuousSdf"], 0);
+              // shader 声明的 uContinuousSdf sampler 必须绑定完整纹理，否则 draw 报 INVALID_OPERATION
+              gl.activeTexture(gl.TEXTURE0);
+              gl.bindTexture(gl.TEXTURE_2D, this.wallpaperTexture);
+              gl.uniform1i(this.uPr["uContinuousSdf"], 0);
+              gl.drawArrays(gl.TRIANGLES, 0, 6);
+              gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            }
+          }
+        }
       }
       for (const el of this.buttonConfigs) {
         if (!el.renderOnTop) continue;
@@ -7227,6 +7256,8 @@ ${sampleCode}}
       indicatorEl.isBottomTabIndicator = {
         groupId: idPrefix,
         dragWidth: tabW,
+        // 静止灰底（选中标签背景，文字在其上方）：浅色模式淡黑、深色模式淡白
+        restColor: palette.tabsTextHalo === "dark" ? [0, 0, 0, 0.06] : [1, 1, 1, 0.16],
         dimColor: palette.backIconColor,
         // CombinedBackdrop: faithful to LiquidBottomTabs.kt 指示器's
         //   rememberCombinedBackdrop(backdrop, tabsBackdrop)
