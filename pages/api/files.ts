@@ -17,6 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     const files = blobs
       .filter(blob => {
+        // 远程控制传输的文件（agent- 前缀）不进入公开下载列表
+        if (blob.pathname.startsWith('agent-')) return false
         // 管理员可以看到所有文件，包括 .gitkeep
         if (admin) {
           return true;

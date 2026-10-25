@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import multer from 'multer'
 import { IncomingForm } from 'formidable'
 import { promises as fs } from 'fs'
 import { put, del, list } from '@vercel/blob'
@@ -239,6 +238,42 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           res.status(200).json({ status: 'success', message: '截图上传成功', url: screenshotUrl })
         } catch (error) {
           console.error('[uploadScreenshot] 错误:', error)
+          res.status(500).json({ status: 'error', message: `服务器内部错误: ${(error as Error).message}` })
+        }
+        break
+      }
+
+      case 'uploadAgentFile': {
+        // 被控电脑文件 → Blob 存储（pathname: agent-{clientId}/{basename}），
+        // 通过 /api/download/<pathname> 供网页下载；/api/files 列表会过滤 agent- 前缀
+        if (!clientId) {
+          res.status(400).json({ status: 'error', message: '缺少客户端ID' })
+          break
+        }
+        try {
+          const { files } = await parseForm(req)
+          const f = files?.file
+          if (!f) {
+            res.status(400).json({ status: 'error', message: '没有接收到文件' })
+            break
+          }
+          const fileObj = Array.isArray(f) ? f[0] : f
+          const filepath = fileObj.filepath
+          const originalName = fileObj.originalFilename || `file-${Date.now()}`
+          const safeName = originalName.replace(/[\\/]/g, '_')
+          const fileData = await fs.readFile(filepath)
+          const blobPath = `agent-${clientId}/${Date.now()}-${safeName}`
+          const uploadResult = await put(blobPath, fileData, {
+            contentType: 'application/octet-stream',
+            access: 'private',
+          })
+          res.status(200).json({
+            status: 'success',
+            message: '文件已上传',
+            pathname: uploadResult.pathname || blobPath,
+          })
+        } catch (error) {
+          console.error('[uploadAgentFile] 错误:', error)
           res.status(500).json({ status: 'error', message: `服务器内部错误: ${(error as Error).message}` })
         }
         break
