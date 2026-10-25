@@ -11,9 +11,14 @@ import type {
   ServerFile,
 } from '../types'
 
-/** 构造下载链接（直接 <a href>） */
+/** 构造下载链接（直接 <a href>），按路径分段编码以支持 a/b/c.txt */
 export function downloadUrl(filename: string): string {
-  return `/api/download/${encodeURIComponent(filename)}`
+  const encoded = filename
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/')
+  return `/api/download/${encoded}`
 }
 
 /** 统一 JSON 请求：网络/解析错误抛异常，业务错误由调用方按 status 判断 */

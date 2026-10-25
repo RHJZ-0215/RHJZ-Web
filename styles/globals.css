@@ -1597,3 +1597,121 @@ html.lg-webgl .nav-ball {
   background: rgba(255, 255, 255, 0.32);
   background-clip: padding-box;
 }
+
+/* ── 程序上传 API 面板 ────────────────────────────────────────── */
+.api-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem 1.6rem;
+  margin-bottom: 1.4rem;
+  font-size: 0.92rem;
+  color: #3c4257;
+}
+
+.api-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.api-meta__key {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a8299;
+}
+
+.api-inline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(59, 91, 255, 0.1);
+  color: #2f49d6;
+  word-break: break-all;
+}
+
+.api-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.api-tab {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.4);
+  color: #3c4257;
+  border-radius: 999px;
+  padding: 0.34rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.api-tab:hover {
+  border-color: rgba(59, 91, 255, 0.45);
+  color: #2f49d6;
+}
+
+.api-tab.is-active {
+  background: linear-gradient(135deg, #3b5bff, #5f7bff);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(59, 91, 255, 0.28);
+}
+
+.code-block {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background: rgba(17, 22, 41, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d7e0ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.api-hint {
+  margin-top: 0.9rem;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: #5a6178;
+}
+
+[data-theme='dark'] .api-meta {
+  color: #c8cde0;
+}
+
+[data-theme='dark'] .api-meta__key {
+  color: #8f97ad;
+}
+
+[data-theme='dark'] .api-inline {
+  background: rgba(122, 141, 255, 0.18);
+  color: #b9c6ff;
+}
+
+[data-theme='dark'] .api-tab {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #c8cde0;
+}
+
+[data-theme='dark'] .api-tab.is-active {
+  background: linear-gradient(135deg, #4a63ff, #6f86ff);
+  color: #fff;
+}
+
+[data-theme='dark'] .code-block {
+  background: rgba(8, 11, 22, 0.94);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #cfd8ff;
+}
+
+[data-theme='dark'] .api-hint {
+  color: #9aa2b8;
+}
